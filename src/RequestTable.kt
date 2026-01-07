@@ -7,7 +7,6 @@ import java.awt.event.ActionEvent
 import java.awt.event.ActionListener
 import java.net.URL
 import java.text.NumberFormat
-import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.*
 import javax.swing.border.BevelBorder
 import javax.swing.table.DefaultTableCellRenderer
@@ -33,23 +32,6 @@ interface OutputHandler {
     abstract fun add(req: Request)
     abstract fun getAllRquests(): List<Request>
 }
-
-class ConsolePrinter() : OutputHandler {
-    private val requestID = AtomicInteger(0)
-
-    init {
-        Utils.out("ID | Word | Status | Wordcount | Length | Time")
-    }
-
-    override fun add(req: Request) {
-        Utils.out(String.format("%s | %s | %s | %s | %s | %s", requestID.incrementAndGet(), req.words.joinToString(separator="/"), req.code, req.wordcount, req.length, req.time))
-    }
-
-    override fun getAllRquests(): List<Request> {
-        return listOf()
-    }
-}
-
 
 class RequestTable(val store: ResultStore, val service: IHttpService, val handler: AttackHandler): JPanel() {
     val model = RequestTableModel()
