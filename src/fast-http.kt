@@ -57,7 +57,7 @@ class Target(val req: String, val rawreq: ByteArray, val endpoint: String, val b
 
 class Wordlist(val bruteforce: Bruteforce, val observedWords: ConcurrentHashMap.KeySetView<String, Boolean>, val clipboard: ArrayList<String>)
 
-fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoint: String, host: String, baseInput: String, outputHandler: OutputHandler, handler: AttackHandler, reqs: MutableList<HttpRequestResponse>?) {
+fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoint: String, host: String, baseInput: String, store: ResultStore, handler: AttackHandler, reqs: MutableList<HttpRequestResponse>?) {
     val pyInterp = PythonInterpreter() // todo add path to bs4
     try {
         Utils.out("Starting attack...")
@@ -71,8 +71,8 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
         }
         pyInterp.set("wordlists", Wordlist(Bruteforce(), Utils.witnessedWords.savedWords, Utils.getClipboard()))
         pyInterp.set("handler", handler)
-        pyInterp.set("outputHandler", outputHandler)
-        pyInterp.set("table", outputHandler)
+        pyInterp.set("outputHandler", store)
+        pyInterp.set("table", store)
         pyInterp.set("requests", reqs)
         pyInterp.set("host", host)
         if (Utils.gotBurp) {
@@ -87,7 +87,7 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
         pyInterp.exec(code)
         pyInterp.exec("queueRequests(target, wordlists)")
         handler.setComplete()
-        pyInterp.exec("completed(outputHandler.getAllRquests())".trimMargin())
+        pyInterp.exec("completed(store.getAllRquests())".trimMargin())
     }
     catch (ex: Exception) {
         var error = ex
@@ -95,7 +95,7 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
         if (stackTrace.contains("Cannot queue any more items - the attack has finished")) {
             Utils.out("Attack aborted with items waiting to be queued.")
             try {
-                pyInterp.exec("completed(outputHandler.getAllRquests())".trimMargin())
+                pyInterp.exec("completed(store.getAllRquests())".trimMargin())
                 handler.abort()
                 return
             } catch (ex2: Exception) {
