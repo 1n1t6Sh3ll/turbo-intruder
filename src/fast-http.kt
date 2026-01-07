@@ -546,8 +546,14 @@ fun main(args : Array<String>) {
             Utils.out("TURBO NOTICE: The input request appears to be using \\n instead of \\r\\n as a line-ending. Consider changing your text-editor settings. Normalising...")
             req = req.replace("\n", "\r\n")
         }
-        val outputHandler = ConsolePrinter()
-        evalJython(code, req, rawReq, endpoint, "", baseInput, outputHandler, attackHandler, mutableListOf())
+        val store = ResultStore()
+        evalJython(code, req, rawReq, endpoint, "", baseInput, store, attackHandler, mutableListOf())
+
+        // Print results to console (replaces ConsolePrinter behavior)
+        println("ID | Word | Status | Wordcount | Length | Time")
+        store.getAllRquests().forEachIndexed { index, req ->
+            println("${index + 1} | ${req.words.joinToString("/")} | ${req.code} | ${req.wordcount} | ${req.length} | ${req.time}")
+        }
     }
 
     catch (e: FileNotFoundException) {
