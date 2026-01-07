@@ -73,6 +73,7 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
         pyInterp.set("handler", handler)
         pyInterp.set("outputHandler", store)
         pyInterp.set("table", store)
+        pyInterp.set("store", store)
         pyInterp.set("requests", reqs)
         pyInterp.set("host", host)
         if (Utils.gotBurp) {
