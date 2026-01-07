@@ -29,6 +29,8 @@ abstract class RequestEngine: IExtensionStateListener {
     val retries = AtomicInteger(0)
     val permaFails = AtomicInteger(0)
     lateinit var outputHandler: OutputHandler
+    @set:JvmName("setRequestTableInternal")
+    var requestTable: RequestTable? = null
     lateinit var requestQueue: LinkedBlockingQueue<Request>
     abstract val callback: (Request, Boolean) -> Boolean?
     abstract var readCallback: ((String) -> Boolean)?
@@ -348,14 +350,13 @@ abstract class RequestEngine: IExtensionStateListener {
             }
 
             // Notify the table model to update the UI
-            val handler = outputHandler
-            if (handler is RequestTable) {
-                handler.model.updateRankings()
+            requestTable?.let { table ->
+                table.model.updateRankings()
 
                 // Auto-sort by anomaly rank if user hasn't customized sorting
                 javax.swing.SwingUtilities.invokeLater {
-                    if (!handler.hasSortBeenModified()) {
-                        handler.autoSortByAnomalyRank()
+                    if (!table.hasSortBeenModified()) {
+                        table.autoSortByAnomalyRank()
                     }
                 }
             }
@@ -380,6 +381,10 @@ abstract class RequestEngine: IExtensionStateListener {
 
     fun setOutput(outputHandler: OutputHandler) {
         this.outputHandler = outputHandler
+    }
+
+    fun setRequestTable(table: RequestTable?) {
+        this.requestTable = table
     }
 
     fun processResponse(req: Request, response: ByteArray): Boolean {

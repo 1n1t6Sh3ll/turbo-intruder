@@ -299,6 +299,7 @@ class RequestEngine:
 
         handler.setRequestEngine(self.engine)
         self.engine.setOutput(outputHandler)
+        self.engine.setRequestTable(requestTable)
         self.userState = self.engine.userState
         self.autoStart = False
         if autoStart:

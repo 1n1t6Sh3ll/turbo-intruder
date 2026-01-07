@@ -57,7 +57,7 @@ class Target(val req: String, val rawreq: ByteArray, val endpoint: String, val b
 
 class Wordlist(val bruteforce: Bruteforce, val observedWords: ConcurrentHashMap.KeySetView<String, Boolean>, val clipboard: ArrayList<String>)
 
-fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoint: String, host: String, baseInput: String, store: ResultStore, handler: AttackHandler, reqs: MutableList<HttpRequestResponse>?) {
+fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoint: String, host: String, baseInput: String, store: ResultStore, handler: AttackHandler, reqs: MutableList<HttpRequestResponse>?, requestTable: RequestTable?) {
     val pyInterp = PythonInterpreter() // todo add path to bs4
     try {
         Utils.out("Starting attack...")
@@ -74,6 +74,7 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
         pyInterp.set("outputHandler", store)
         pyInterp.set("table", store)
         pyInterp.set("store", store)
+        pyInterp.set("requestTable", requestTable)
         pyInterp.set("requests", reqs)
         pyInterp.set("host", host)
         if (Utils.gotBurp) {
@@ -437,7 +438,7 @@ class TurboIntruderFrame(inputReq: IHttpRequestResponse, val selectionBounds: In
                                 script = script.replace("\r\n", "\n")
                                 script = script.replace("\n", "\r\n")
                                 title += " - running"
-                                evalJython(script, baseRequest, messageEditor.message, target, inputHost, baseInput, resultStore!!, handler, reqs)
+                                evalJython(script, baseRequest, messageEditor.message, target, inputHost, baseInput, resultStore!!, handler, reqs, requestTable)
                             }
                         }
                     }
@@ -548,7 +549,7 @@ fun main(args : Array<String>) {
             req = req.replace("\n", "\r\n")
         }
         val store = ResultStore()
-        evalJython(code, req, rawReq, endpoint, "", baseInput, store, attackHandler, mutableListOf())
+        evalJython(code, req, rawReq, endpoint, "", baseInput, store, attackHandler, mutableListOf(), null)
 
         // Print results to console (replaces ConsolePrinter behavior)
         println("ID | Word | Status | Wordcount | Length | Time")
