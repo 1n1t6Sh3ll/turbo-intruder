@@ -51,7 +51,7 @@ class ConsolePrinter() : OutputHandler {
 }
 
 
-class RequestTable(val service: IHttpService, val handler: AttackHandler): JPanel(), OutputHandler {
+class RequestTable(val store: ResultStore, val service: IHttpService, val handler: AttackHandler): JPanel() {
     val model = RequestTableModel()
     val issueTable = JTable(model)
     val requestEditor: IMessageEditor
