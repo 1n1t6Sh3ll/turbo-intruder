@@ -60,7 +60,6 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
     val requestListView: JScrollPane
     private val controller = MessageEditorController()
     private var currentRequest: Request? = null
-    private var firstEntry = true
     private val lock = Object()
     private var descending = true
     private var initialized = false
@@ -189,6 +188,25 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
         updateStatusbar.timer = panelUpdater
         panelUpdater.start()
 
+        // Poll ResultStore for new results
+        var lastKnownSize = 0
+        val storePoller = javax.swing.Timer(100) {
+            val currentSize = store.count()
+            if (currentSize > lastKnownSize) {
+                for (i in lastKnownSize until currentSize) {
+                    val req = store.getRequest(i)
+                    if (req != null) {
+                        model.addRow(req)
+                        if (lastKnownSize == 0) {
+                            setCurrentRequest(req)
+                        }
+                    }
+                }
+                lastKnownSize = currentSize
+            }
+        }
+        storePoller.start()
+
         val menu = JPopupMenu()
 
         val reportToOrganizerButton = JMenuItem("Save to Organizer")
@@ -272,21 +290,6 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
             }
             return requests
         }
-    }
-
-    override fun add(req: Request) {
-        synchronized(lock) {
-            model.addRow(req)
-        }
-
-        if (firstEntry) {
-            setCurrentRequest(req)
-            firstEntry = false
-        }
-    }
-
-    override fun getAllRquests(): List<Request> {
-        return model.getAllRequests()
     }
 
     inner class MessageEditorController : IMessageEditorController {
