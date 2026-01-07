@@ -172,7 +172,17 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
 
         // Poll ResultStore for new results
         var lastKnownSize = 0
+        var finishedAt: Long? = null
         val storePoller = javax.swing.Timer(100) {
+            // Stop polling 10 seconds after attack completes
+            if (handler.hasFinished()) {
+                if (finishedAt == null) {
+                    finishedAt = System.currentTimeMillis()
+                } else if (System.currentTimeMillis() - finishedAt!! > 10000) {
+                    (it.source as javax.swing.Timer).stop()
+                    return@Timer
+                }
+            }
             val currentSize = store.count()
             if (currentSize > lastKnownSize) {
                 for (i in lastKnownSize until currentSize) {
