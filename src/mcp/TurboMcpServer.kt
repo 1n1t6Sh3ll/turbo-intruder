@@ -104,18 +104,22 @@ class TurboMcpServer(private val port: Int = 31337) {
             """.trimIndent())
             .build()
 
-        return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
-            val result = toolHandlers.startRun(
-                script = args["script"] as? String ?: "",
-                baseRequest = args["base_request"] as? String ?: "",
-                endpoint = args["endpoint"] as? String ?: "",
-                baseInput = args["base_input"] as? String ?: ""
-            )
-            McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
-                false
-            )
-        }
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                val args = request.arguments()
+                val result = toolHandlers.startRun(
+                    script = args["script"] as? String ?: "",
+                    baseRequest = args["base_request"] as? String ?: "",
+                    endpoint = args["endpoint"] as? String ?: "",
+                    baseInput = args["base_input"] as? String ?: ""
+                )
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
     }
 
     private fun buildStartConcurrentRunTool(): McpServerFeatures.SyncToolSpecification {
@@ -148,18 +152,22 @@ class TurboMcpServer(private val port: Int = 31337) {
             """.trimIndent())
             .build()
 
-        return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
-            val result = toolHandlers.startConcurrentRun(
-                script = args["script"] as? String ?: "",
-                baseRequest = args["base_request"] as? String ?: "",
-                endpoint = args["endpoint"] as? String ?: "",
-                baseInput = args["base_input"] as? String ?: ""
-            )
-            McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
-                false
-            )
-        }
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                val args = request.arguments()
+                val result = toolHandlers.startConcurrentRun(
+                    script = args["script"] as? String ?: "",
+                    baseRequest = args["base_request"] as? String ?: "",
+                    endpoint = args["endpoint"] as? String ?: "",
+                    baseInput = args["base_input"] as? String ?: ""
+                )
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
     }
 
     private fun buildStopRunTool(): McpServerFeatures.SyncToolSpecification {
@@ -179,13 +187,16 @@ class TurboMcpServer(private val port: Int = 31337) {
             """.trimIndent())
             .build()
 
-        return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
-            val result = toolHandlers.stopRun(args["run_id"] as? String)
-            McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
-                false
-            )
-        }
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                val result = toolHandlers.stopRun(request.arguments()["run_id"] as? String)
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
     }
 
     private fun buildDeleteRunTool(): McpServerFeatures.SyncToolSpecification {
@@ -205,13 +216,16 @@ class TurboMcpServer(private val port: Int = 31337) {
             """.trimIndent())
             .build()
 
-        return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
-            val result = toolHandlers.deleteRun(args["run_id"] as? String)
-            McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
-                false
-            )
-        }
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                val result = toolHandlers.deleteRun(request.arguments()["run_id"] as? String)
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
     }
 
     private fun buildDeleteAllRunsTool(): McpServerFeatures.SyncToolSpecification {
@@ -226,13 +240,16 @@ class TurboMcpServer(private val port: Int = 31337) {
             """.trimIndent())
             .build()
 
-        return McpServerFeatures.SyncToolSpecification(tool) { _, _ ->
-            val result = toolHandlers.deleteAllRuns()
-            McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
-                false
-            )
-        }
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, _ ->
+                val result = toolHandlers.deleteAllRuns()
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
     }
 
     private fun buildResourceSpecifications(): List<McpServerFeatures.SyncResourceSpecification> {
