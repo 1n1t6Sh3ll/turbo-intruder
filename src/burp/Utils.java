@@ -73,7 +73,7 @@ public class Utils {
             stdout.println(message);
         }
         else {
-            System.out.println(message);
+            System.err.println(message);
         }
 
     }
@@ -82,7 +82,7 @@ public class Utils {
             stderr.println(message);
         }
         else {
-            System.out.println(message);
+            System.err.println(message);
         }
     }
 
