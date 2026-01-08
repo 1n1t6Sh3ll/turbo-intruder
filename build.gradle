@@ -51,6 +51,9 @@ dependencies {
     implementation files('albinowaxUtils-all.jar') // includes burp wiener API
     // implementation files('http2-spike-enhanced-obfuscated.jar') // used for research only
 
+    // MCP Server
+    implementation 'io.modelcontextprotocol.sdk:mcp:0.10.0'
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
     // testImplementation 'io.mockk:mockk:1.13.13'  // Add when needed
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
