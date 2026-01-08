@@ -31,6 +31,11 @@ sourceSets {
             srcDir 'resources'
         }
     }
+    test {
+        kotlin {
+            srcDir 'test/kotlin'
+        }
+    }
 }
 
 dependencies {
@@ -45,6 +50,18 @@ dependencies {
     implementation files('hpack-1.0.2.jar')
     implementation files('albinowaxUtils-all.jar') // includes burp wiener API
     // implementation files('http2-spike-enhanced-obfuscated.jar') // used for research only
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
+    // testImplementation 'io.mockk:mockk:1.13.13'  // Add when needed
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 task fatJar(type: Jar) {
