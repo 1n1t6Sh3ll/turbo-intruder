@@ -48,8 +48,9 @@ Add an MCP server to Turbo Intruder that enables Claude Code to start/stop runs 
 - **SDK**: MCP Java SDK for protocol compliance
 - **Concurrency**: Two modes - simple (single run) and concurrent (multiple runs with IDs)
 - **Default behavior**: `start_run` clears previous runs; `start_concurrent_run` preserves them
+- **Hybrid API**: Tools for actions, Resources for read-only data
 
-## MCP Tools
+## MCP Tools (Actions)
 
 ### start_run
 
@@ -94,57 +95,6 @@ Returns:
   - status: "stopped" | "not_found" | "no_current_run"
 ```
 
-### get_status
-
-Gets run status and progress.
-
-```
-Parameters:
-  - run_id: string (optional, defaults to current run)
-
-Returns:
-  - run_id: string
-  - running: boolean
-  - finished: boolean
-  - status_message: string
-  - result_count: int
-```
-
-### get_results
-
-Queries results with sorting and pagination.
-
-```
-Parameters:
-  - run_id: string (optional, defaults to current run)
-  - sort_by: "id" | "status" | "length" | "time" | "wordcount" | "anomaly_rank" | "arrival" (default: "id")
-  - descending: boolean (default: true)
-  - limit: int (default: 100)
-  - offset: int (default: 0)
-
-Returns:
-  - results: array of {id, status, length, time, wordcount, words, label}
-  - total_count: int
-```
-
-### get_request_detail
-
-Gets full request/response for a specific result.
-
-```
-Parameters:
-  - run_id: string (optional, defaults to current run)
-  - request_id: int
-
-Returns:
-  - request: string (full HTTP request)
-  - response: string (full HTTP response)
-  - status: int
-  - length: int
-  - time: long
-  - words: array of strings
-```
-
 ### delete_run
 
 Deletes a run and frees memory.
@@ -168,36 +118,109 @@ Returns:
   - deleted_count: int
 ```
 
+## MCP Resources (Read-Only Data)
+
+Resources provide read-only access to run data via URI templates.
+
+### Resource Templates
+
+```
+turbo://runs                              → List all runs
+turbo://runs/current                      → Current run (alias)
+turbo://runs/{run_id}                     → Specific run status
+turbo://runs/{run_id}/results             → Results for a run
+turbo://runs/{run_id}/requests/{req_id}   → Specific request detail
+```
+
+### turbo://runs
+
+Lists all active runs.
+
+```
+Response:
+  - runs: array of {run_id, running, finished, result_count, created_at}
+```
+
+### turbo://runs/current
+
+Alias for the most recently started run. Returns same data as `turbo://runs/{run_id}`.
+
+### turbo://runs/{run_id}
+
+Gets status and metadata for a specific run.
+
+```
+Response:
+  - run_id: string
+  - running: boolean
+  - finished: boolean
+  - status_message: string
+  - result_count: int
+  - created_at: long (timestamp)
+```
+
+### turbo://runs/{run_id}/results
+
+Gets results for a run. Supports query parameters for sorting/pagination.
+
+```
+Query Parameters:
+  - sort_by: "id" | "status" | "length" | "time" | "wordcount" | "anomaly_rank" | "arrival" (default: "id")
+  - descending: "true" | "false" (default: "true")
+  - limit: int (default: 100)
+  - offset: int (default: 0)
+
+Example: turbo://runs/abc123/results?sort_by=status&limit=50
+
+Response:
+  - results: array of {id, status, length, time, wordcount, words, label}
+  - total_count: int
+```
+
+### turbo://runs/{run_id}/requests/{request_id}
+
+Gets full request/response detail for a specific result.
+
+```
+Response:
+  - request: string (full HTTP request)
+  - response: string (full HTTP response)
+  - status: int
+  - length: int
+  - time: long
+  - words: array of strings
+```
+
 ## Usage Patterns
 
 ### Simple mode (99% of usage)
 
 ```python
-# Start a run (clears any previous)
+# Start a run (clears any previous) - TOOL
 start_run(script="...", base_request="...", endpoint="https://target.com")
 
-# Check progress
-get_status()  # → {running: true, result_count: 150, ...}
+# Check progress - RESOURCE
+read("turbo://runs/current")  # → {running: true, result_count: 150, ...}
 
-# Get results
-get_results(sort_by="status", limit=50)
+# Get results - RESOURCE
+read("turbo://runs/current/results?sort_by=status&limit=50")
 
-# Get details for interesting result
-get_request_detail(request_id=42)
+# Get details for interesting result - RESOURCE
+read("turbo://runs/current/requests/42")
 ```
 
 ### Concurrent mode
 
 ```python
-# Start multiple runs
+# Start multiple runs - TOOLS
 id1 = start_concurrent_run(script=script1, ...)["run_id"]
 id2 = start_concurrent_run(script=script2, ...)["run_id"]
 
-# Query specific runs
-get_status(run_id=id1)
-get_results(run_id=id2)
+# Query specific runs - RESOURCES
+read(f"turbo://runs/{id1}")
+read(f"turbo://runs/{id2}/results")
 
-# Clean up
+# Clean up - TOOL
 delete_run(run_id=id1)
 ```
 
@@ -241,7 +264,8 @@ class BurpExtender : IBurpExtender {
 - `src/mcp/TurboMcpServer.kt` - HTTP server setup using MCP SDK
 - `src/mcp/RunManager.kt` - Manages current and concurrent runs
 - `src/mcp/ActiveRun.kt` - Bundles RunHandler + ResultStore + metadata
-- `src/mcp/ToolHandlers.kt` - Implements the 8 tool handlers
+- `src/mcp/ToolHandlers.kt` - Implements the 5 action tools
+- `src/mcp/ResourceHandlers.kt` - Implements the resource URI handlers
 
 ## Dependencies
 
@@ -263,7 +287,9 @@ implementation 'io.modelcontextprotocol.sdk:mcp:0.10.0'
 - `RunManagerTest` - create/get/stop/delete runs, concurrent access
 - `ActiveRunTest` - lifecycle states, result storage
 - `ToolHandlersTest` - each tool with valid/invalid inputs
+- `ResourceHandlersTest` - URI parsing, resource responses
 
 ### Integration tests
 - Start MCP server, call tools via HTTP, verify responses
-- Full run lifecycle: start → poll status → get results → delete
+- Read resources via MCP protocol, verify URI routing
+- Full run lifecycle: start → read status → read results → delete
