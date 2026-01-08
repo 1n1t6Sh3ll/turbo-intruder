@@ -32,6 +32,7 @@ class TurboMcpServer(private val port: Int = 31337) {
         // Create the MCP SSE transport provider
         val transportProvider = HttpServletSseServerTransportProvider.builder()
             .objectMapper(objectMapper)
+            .messageEndpoint("/mcp/message")
             .build()
 
         // Set up servlet context
