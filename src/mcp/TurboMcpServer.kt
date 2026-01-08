@@ -1,6 +1,7 @@
 package mcp
 
-import io.modelcontextprotocol.json.McpJsonMapper
+import com.fasterxml.jackson.databind.ObjectMapper
+import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper
 import io.modelcontextprotocol.server.McpServer
 import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpSyncServer
@@ -19,9 +20,20 @@ class TurboMcpServer(private val port: Int = 31337) {
 
     private var server: McpSyncServer? = null
     private var jettyServer: Server? = null
-    private val jsonMapper = McpJsonMapper.getDefault()
+    private val jsonMapper = JacksonMcpJsonMapper(ObjectMapper())
 
     fun start() {
+        // Fix classloader for ServiceLoader in Burp's environment
+        val originalClassLoader = Thread.currentThread().contextClassLoader
+        Thread.currentThread().contextClassLoader = this::class.java.classLoader
+        try {
+            startInternal()
+        } finally {
+            Thread.currentThread().contextClassLoader = originalClassLoader
+        }
+    }
+
+    private fun startInternal() {
         // Create Jetty server on specified port
         val jetty = Server()
         val connector = ServerConnector(jetty)

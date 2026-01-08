@@ -75,11 +75,9 @@ jar {
 task fatJar(type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     manifest {
-        attributes('Class-Path': configurations.compileClasspath.collect { it.getName() }.join(' '),
-                'Main-Class': 'burp.Fast_httpKt'
-        )
+        attributes('Main-Class': 'burp.Fast_httpKt')
     }
-    from { configurations.compileClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
 
