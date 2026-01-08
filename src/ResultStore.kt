@@ -27,8 +27,8 @@ class ResultStore : OutputHandler {
         results.clear()
     }
 
-    fun getRequest(index: Int): Request? {
-        return if (index >= 0 && index < results.size) results[index] else null
+    fun getRequest(id: Int): Request? {
+        return results.find { it.id == id }
     }
 
     fun getResults(
