@@ -1,5 +1,14 @@
 # Turbo Intruder
 
+## Building
+
+Always use the fatJar task for all builds:
+```bash
+./gradlew fatJar
+```
+
+The output JAR is at `build/libs/turbo-intruder.jar`.
+
 ## Running the MCP Server
 
 Build and run:
