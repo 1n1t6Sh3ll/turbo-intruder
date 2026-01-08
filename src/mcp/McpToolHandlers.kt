@@ -1,5 +1,6 @@
 package mcp
 
+import burp.Utils
 import burp.evalJython
 import kotlin.concurrent.thread
 
@@ -75,12 +76,14 @@ class McpToolHandlers(
             .substringBefore(":")
             .substringBefore("/")
 
+        val normalizedRequest = Utils.normalizeLineEndings(baseRequest)
+
         thread {
             try {
                 evalJython(
                     code = script,
-                    baseRequest = baseRequest,
-                    rawRequest = baseRequest.toByteArray(Charsets.ISO_8859_1),
+                    baseRequest = normalizedRequest,
+                    rawRequest = normalizedRequest.toByteArray(Charsets.ISO_8859_1),
                     endpoint = endpoint,
                     host = host,
                     baseInput = baseInput,

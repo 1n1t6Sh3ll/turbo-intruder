@@ -558,8 +558,8 @@ fun main(args : Array<String>) {
         Utils.out("Please note that Turbo Intruder's SSL/TLS handling may differ slightly when run outside Burp Suite.")
         if(!req.contains("\r\n")) {
             Utils.out("TURBO NOTICE: The input request appears to be using \\n instead of \\r\\n as a line-ending. Consider changing your text-editor settings. Normalising...")
-            req = req.replace("\n", "\r\n")
         }
+        req = Utils.normalizeLineEndings(req)
         val store = ResultStore()
         evalJython(code, req, rawReq, endpoint, "", baseInput, store, runHandler, mutableListOf(), null)
 

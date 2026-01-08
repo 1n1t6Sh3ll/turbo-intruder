@@ -128,6 +128,13 @@ public class Utils {
         return Arrays.copyOfRange(response, bodyStart, response.length);
     }
 
+    public static String normalizeLineEndings(String request) {
+        if (!request.contains("\r\n")) {
+            return request.replace("\n", "\r\n");
+        }
+        return request;
+    }
+
     public static int getBodyStart(byte[] response) {
         return indexOf(response, "\r\n\r\n".getBytes())+4;
 
