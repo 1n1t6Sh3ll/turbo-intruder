@@ -4,7 +4,7 @@ import io.modelcontextprotocol.json.McpJsonMapper
 import io.modelcontextprotocol.server.McpServer
 import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpSyncServer
-import io.modelcontextprotocol.server.transport.HttpServletSseServerTransportProvider
+import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider
 import io.modelcontextprotocol.spec.McpSchema
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler
 import org.eclipse.jetty.ee10.servlet.ServletHolder
@@ -29,10 +29,10 @@ class TurboMcpServer(private val port: Int = 31337) {
         connector.port = port
         jetty.addConnector(connector)
 
-        // Create the MCP SSE transport provider
-        val transportProvider = HttpServletSseServerTransportProvider.builder()
+        // Create the MCP streaming HTTP transport provider
+        val transportProvider = HttpServletStreamableServerTransportProvider.builder()
             .jsonMapper(jsonMapper)
-            .messageEndpoint("/mcp/message")
+            .mcpEndpoint("/mcp")
             .build()
 
         // Set up servlet context
