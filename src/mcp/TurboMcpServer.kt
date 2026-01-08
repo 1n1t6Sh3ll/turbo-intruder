@@ -82,7 +82,8 @@ class TurboMcpServer(private val port: Int = 31338) {
             buildStartConcurrentRunTool(),
             buildStopRunTool(),
             buildDeleteRunTool(),
-            buildDeleteAllRunsTool()
+            buildDeleteAllRunsTool(),
+            buildGetOrganizerItemsTool()
         )
     }
 
@@ -256,6 +257,39 @@ class TurboMcpServer(private val port: Int = 31338) {
             .tool(tool)
             .callHandler { _, _ ->
                 val result = toolHandlers.deleteAllRuns()
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
+    }
+
+    private fun buildGetOrganizerItemsTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("get_organizer_items")
+            .description("Retrieve items from Burp's Organizer by their IDs. Returns the full request and response for each item.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "ids": {
+                        "type": "string",
+                        "description": "Comma-separated list of Organizer item IDs to retrieve (e.g., '100,101,102')"
+                    }
+                },
+                "required": ["ids"]
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                val args = request.arguments()
+                val result = toolHandlers.getOrganizerItems(
+                    ids = args["ids"] as? String ?: ""
+                )
                 McpSchema.CallToolResult.builder()
                     .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
                     .isError(false)

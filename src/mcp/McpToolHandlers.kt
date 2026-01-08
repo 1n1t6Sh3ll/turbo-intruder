@@ -3,7 +3,27 @@ package mcp
 import burp.evalJython
 import kotlin.concurrent.thread
 
-class McpToolHandlers(private val manager: RunManager) {
+class McpToolHandlers(
+    private val manager: RunManager,
+    private val organizerProvider: OrganizerProvider = BurpOrganizerProvider()
+) {
+
+    fun getOrganizerItems(ids: String): Map<String, Any?> {
+        val idSet = ids.split(",")
+            .mapNotNull { it.trim().toIntOrNull() }
+            .toSet()
+
+        val items = organizerProvider.getItemsByIds(idSet)
+        return mapOf(
+            "items" to items.map { item ->
+                mapOf(
+                    "id" to item.id,
+                    "request" to item.request,
+                    "response" to item.response
+                )
+            }
+        )
+    }
 
     fun startRun(
         script: String,

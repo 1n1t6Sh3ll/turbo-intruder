@@ -18,7 +18,7 @@ public class Utils {
     static boolean gotBurp = false;
     static IBurpExtenderCallbacks callbacks;
     static IExtensionHelpers helpers;
-    static MontoyaApi montoyaApi;
+    public static MontoyaApi montoyaApi;
     private static PrintWriter stdout;
     private static PrintWriter stderr;
     static WordRecorder witnessedWords = new WordRecorder();

@@ -1,0 +1,40 @@
+package mcp
+
+import burp.Utils
+import burp.api.montoya.organizer.OrganizerItemFilter
+
+data class OrganizerItemData(
+    val id: Int,
+    val request: String,
+    val response: String
+)
+
+interface OrganizerProvider {
+    fun getItems(): List<OrganizerItemData>
+    fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData>
+}
+
+class BurpOrganizerProvider : OrganizerProvider {
+    override fun getItems(): List<OrganizerItemData> {
+        val organizer = Utils.montoyaApi?.organizer() ?: return emptyList()
+        return organizer.items().map { item ->
+            OrganizerItemData(
+                id = item.id(),
+                request = item.request()?.toString() ?: "",
+                response = item.response()?.toString() ?: ""
+            )
+        }
+    }
+
+    override fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData> {
+        val organizer = Utils.montoyaApi?.organizer() ?: return emptyList()
+        val filter = OrganizerItemFilter { item -> item.id() in ids }
+        return organizer.items(filter).map { item ->
+            OrganizerItemData(
+                id = item.id(),
+                request = item.request()?.toString() ?: "",
+                response = item.response()?.toString() ?: ""
+            )
+        }
+    }
+}
