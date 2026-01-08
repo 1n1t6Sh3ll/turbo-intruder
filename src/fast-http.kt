@@ -525,6 +525,18 @@ class TurboIntruderFrame(inputReq: IHttpRequestResponse, val selectionBounds: In
 
 
 fun main(args : Array<String>) {
+    if (args.contains("--mcp")) {
+        val server = mcp.TurboMcpServer(port = 31337)
+        server.start()
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            server.stop()
+        })
+
+        // Keep main thread alive
+        Thread.currentThread().join()
+        return
+    }
 
     try {
         val scriptFile = args[0]

@@ -26,8 +26,11 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
         const val version = "1.62"
     }
 
+    private var mcpServer: mcp.TurboMcpServer? = null
+
     override fun extensionUnloaded() {
         Utils.unloaded = true
+        mcpServer?.stop()
     }
 
     override fun registerExtenderCallbacks(callbacks: IBurpExtenderCallbacks) {
@@ -43,6 +46,9 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
 
         SwingUtilities.invokeLater(ConfigMenu())
         SwingUtilities.invokeLater { addRunScriptToExistingMenu() }
+
+        mcpServer = mcp.TurboMcpServer(port = 31337)
+        mcpServer?.start()
     }
 
     override fun initialize(montoyaApi: MontoyaApi) {
