@@ -9,15 +9,7 @@ java -jar build/libs/turbo-intruder.jar --mcp
 
 **Burp extension:** Auto-starts when extension loads.
 
-Server listens on `localhost:31337` using HTTP/SSE transport.
-
----
-
-## MCP Protocol Flow
-
-1. **Connect to SSE** → `GET /sse` returns session ID
-2. **Initialize** → POST to `/mcp/message?sessionId=XXX`
-3. **Call tools/resources** → POST messages, responses via SSE
+Server listens on `localhost:31337` using streaming HTTP transport.
 
 ---
 
@@ -49,3 +41,16 @@ Server listens on `localhost:31337` using HTTP/SSE transport.
 | `turbo://runs/{id}/requests/{n}` | Full request/response detail |
 
 Use `current` as the run ID to reference the most recent run.
+
+### Documentation Resources
+
+| URI | Description |
+|-----|-------------|
+| `turbo://docs` | List available documentation topics |
+| `turbo://docs/api-quickstart` | Quick reference for scripting |
+| `turbo://docs/engines` | Engine types (THREADED, BURP, BURP2) |
+| `turbo://docs/settings` | Complete parameter reference |
+| `turbo://docs/race-conditions` | Race condition testing with gates |
+| `turbo://docs/response-processing` | Handling and filtering responses |
+| `turbo://docs/decorators` | Response decorator reference |
+| `turbo://docs/misc` | Wordlists and utilities |

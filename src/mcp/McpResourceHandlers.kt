@@ -1,8 +1,19 @@
 package mcp
 
 import burp.SortField
+import java.io.File
 
 class McpResourceHandlers(private val manager: RunManager) {
+
+    private val docTopics = mapOf(
+        "api-quickstart" to "Quick reference for scripting",
+        "engines" to "Engine types (THREADED, BURP, BURP2)",
+        "settings" to "Complete parameter reference",
+        "race-conditions" to "Race condition testing with gates",
+        "response-processing" to "Handling and filtering responses",
+        "decorators" to "Response decorator reference",
+        "misc" to "Wordlists and utilities"
+    )
 
     fun listRuns(): Map<String, Any> {
         val runs = manager.getAllRuns().map { run ->
@@ -82,6 +93,59 @@ class McpResourceHandlers(private val manager: RunManager) {
         )
     }
 
+    // Documentation resources
+
+    fun listDocs(): Map<String, Any> {
+        return mapOf(
+            "topics" to docTopics.map { (name, description) ->
+                mapOf(
+                    "name" to name,
+                    "uri" to "turbo://docs/$name",
+                    "description" to description
+                )
+            }
+        )
+    }
+
+    fun getDoc(topic: String): Map<String, Any?> {
+        if (!docTopics.containsKey(topic)) {
+            return mapOf("error" to "unknown_topic", "available_topics" to docTopics.keys.toList())
+        }
+
+        val content = loadDocContent(topic)
+            ?: return mapOf("error" to "doc_not_found")
+
+        return mapOf(
+            "topic" to topic,
+            "content" to content
+        )
+    }
+
+    private fun loadDocContent(topic: String): String? {
+        // Try loading from classpath resources first (when running as jar)
+        // docs folder is added as resource root, so files are at /$topic.md
+        val resourcePath = "/$topic.md"
+        javaClass.getResourceAsStream(resourcePath)?.use { stream ->
+            return stream.bufferedReader().readText()
+        }
+
+        // Fall back to file system (for development)
+        val possiblePaths = listOf(
+            "docs/$topic.md",
+            "../docs/$topic.md",
+            "../../docs/$topic.md"
+        )
+
+        for (path in possiblePaths) {
+            val file = File(path)
+            if (file.exists()) {
+                return file.readText()
+            }
+        }
+
+        return null
+    }
+
     // URI parsing utilities
 
     fun parseRunId(uri: String): String? {
@@ -107,9 +171,19 @@ class McpResourceHandlers(private val manager: RunManager) {
             .toMap()
     }
 
+    fun parseDocTopic(uri: String): String? {
+        val match = Regex("turbo://docs/([^/\\?]+)").find(uri)
+        return match?.groupValues?.get(1)
+    }
+
     fun handleResourceRead(uri: String): Map<String, Any?> {
         return when {
             uri == "turbo://runs" -> listRuns()
+            uri == "turbo://docs" -> listDocs()
+            uri.matches(Regex("turbo://docs/[^/]+")) -> {
+                val topic = parseDocTopic(uri) ?: return mapOf("error" to "invalid_topic")
+                getDoc(topic)
+            }
             uri.matches(Regex("turbo://runs/[^/]+/requests/\\d+.*")) -> {
                 val runId = parseRunId(uri)
                 val requestId = parseRequestId(uri) ?: return mapOf("error" to "invalid_request_id")

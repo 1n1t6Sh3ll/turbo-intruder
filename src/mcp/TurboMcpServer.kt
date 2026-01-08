@@ -257,7 +257,9 @@ class TurboMcpServer(private val port: Int = 31337) {
             buildRunsListResource(),
             buildRunStatusResourceTemplate(),
             buildRunResultsResourceTemplate(),
-            buildRequestDetailResourceTemplate()
+            buildRequestDetailResourceTemplate(),
+            buildDocsListResource(),
+            buildDocTopicResourceTemplate()
         )
     }
 
@@ -351,6 +353,59 @@ class TurboMcpServer(private val port: Int = 31337) {
                     jsonMapper.writeValueAsString(result)
                 ))
             )
+        }
+    }
+
+    private fun buildDocsListResource(): McpServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://docs")
+            .name("Turbo Intruder documentation topics")
+            .description("List available documentation topics for scripting reference")
+            .mimeType("application/json")
+            .build()
+
+        return McpServerFeatures.SyncResourceSpecification(resource) { _, _ ->
+            val result = resourceHandlers.listDocs()
+            McpSchema.ReadResourceResult(
+                listOf(McpSchema.TextResourceContents(
+                    "turbo://docs",
+                    "application/json",
+                    jsonMapper.writeValueAsString(result)
+                ))
+            )
+        }
+    }
+
+    private fun buildDocTopicResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://docs/{topic}")
+            .name("Documentation for a specific topic")
+            .description("Get documentation content. Topics: api-quickstart, engines, settings, race-conditions, response-processing, decorators, misc")
+            .mimeType("text/markdown")
+            .build()
+
+        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+            val uri = request.uri()
+            val topic = resourceHandlers.parseDocTopic(uri)
+            val result = resourceHandlers.getDoc(topic ?: "")
+
+            if (result.containsKey("error")) {
+                McpSchema.ReadResourceResult(
+                    listOf(McpSchema.TextResourceContents(
+                        uri,
+                        "application/json",
+                        jsonMapper.writeValueAsString(result)
+                    ))
+                )
+            } else {
+                McpSchema.ReadResourceResult(
+                    listOf(McpSchema.TextResourceContents(
+                        uri,
+                        "text/markdown",
+                        result["content"] as String
+                    ))
+                )
+            }
         }
     }
 }
