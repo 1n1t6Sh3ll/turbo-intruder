@@ -1,6 +1,6 @@
 package mcp
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import io.modelcontextprotocol.json.McpJsonMapper
 import io.modelcontextprotocol.server.McpServer
 import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpSyncServer
@@ -19,7 +19,7 @@ class TurboMcpServer(private val port: Int = 31337) {
 
     private var server: McpSyncServer? = null
     private var jettyServer: Server? = null
-    private val objectMapper = ObjectMapper()
+    private val jsonMapper = McpJsonMapper.getDefault()
 
     fun start() {
         // Create Jetty server on specified port
@@ -31,7 +31,7 @@ class TurboMcpServer(private val port: Int = 31337) {
 
         // Create the MCP SSE transport provider
         val transportProvider = HttpServletSseServerTransportProvider.builder()
-            .objectMapper(objectMapper)
+            .jsonMapper(jsonMapper)
             .messageEndpoint("/mcp/message")
             .build()
 
@@ -48,8 +48,8 @@ class TurboMcpServer(private val port: Int = 31337) {
         server = McpServer.sync(transportProvider)
             .serverInfo("turbo-intruder", "1.0.0")
             .capabilities(McpSchema.ServerCapabilities.builder()
-                .tools(true)
-                .resources(true, true)
+                .tools(true)  // listChanged
+                .resources(true, true)  // subscribe, listChanged
                 .logging()
                 .build())
             .tools(buildToolSpecifications())
@@ -75,10 +75,10 @@ class TurboMcpServer(private val port: Int = 31337) {
     }
 
     private fun buildStartRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool(
-            "start_run",
-            "Start a new Turbo Intruder attack run. This clears any previous runs and starts fresh. Use for single-run scenarios.",
-            """
+        val tool = McpSchema.Tool.builder()
+            .name("start_run")
+            .description("Start a new Turbo Intruder attack run. This clears any previous runs and starts fresh. Use for single-run scenarios.")
+            .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
@@ -101,8 +101,8 @@ class TurboMcpServer(private val port: Int = 31337) {
                 },
                 "required": ["script", "base_request", "endpoint"]
             }
-            """.trimIndent()
-        )
+            """.trimIndent())
+            .build()
 
         return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
             val result = toolHandlers.startRun(
@@ -112,17 +112,17 @@ class TurboMcpServer(private val port: Int = 31337) {
                 baseInput = args["base_input"] as? String ?: ""
             )
             McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(objectMapper.writeValueAsString(result))),
+                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
                 false
             )
         }
     }
 
     private fun buildStartConcurrentRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool(
-            "start_concurrent_run",
-            "Start a new concurrent attack run. Does not clear previous runs, allowing multiple runs to execute in parallel.",
-            """
+        val tool = McpSchema.Tool.builder()
+            .name("start_concurrent_run")
+            .description("Start a new concurrent attack run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
+            .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
@@ -145,8 +145,8 @@ class TurboMcpServer(private val port: Int = 31337) {
                 },
                 "required": ["script", "base_request", "endpoint"]
             }
-            """.trimIndent()
-        )
+            """.trimIndent())
+            .build()
 
         return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
             val result = toolHandlers.startConcurrentRun(
@@ -156,17 +156,17 @@ class TurboMcpServer(private val port: Int = 31337) {
                 baseInput = args["base_input"] as? String ?: ""
             )
             McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(objectMapper.writeValueAsString(result))),
+                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
                 false
             )
         }
     }
 
     private fun buildStopRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool(
-            "stop_run",
-            "Stop a running attack. Aborts the attack but preserves the results.",
-            """
+        val tool = McpSchema.Tool.builder()
+            .name("stop_run")
+            .description("Stop a running attack. Aborts the attack but preserves the results.")
+            .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
@@ -176,23 +176,23 @@ class TurboMcpServer(private val port: Int = 31337) {
                     }
                 }
             }
-            """.trimIndent()
-        )
+            """.trimIndent())
+            .build()
 
         return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
             val result = toolHandlers.stopRun(args["run_id"] as? String)
             McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(objectMapper.writeValueAsString(result))),
+                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
                 false
             )
         }
     }
 
     private fun buildDeleteRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool(
-            "delete_run",
-            "Delete a run and all its results. Also stops the run if it's still executing.",
-            """
+        val tool = McpSchema.Tool.builder()
+            .name("delete_run")
+            .description("Delete a run and all its results. Also stops the run if it's still executing.")
+            .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
@@ -202,34 +202,34 @@ class TurboMcpServer(private val port: Int = 31337) {
                     }
                 }
             }
-            """.trimIndent()
-        )
+            """.trimIndent())
+            .build()
 
         return McpServerFeatures.SyncToolSpecification(tool) { _, args ->
             val result = toolHandlers.deleteRun(args["run_id"] as? String)
             McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(objectMapper.writeValueAsString(result))),
+                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
                 false
             )
         }
     }
 
     private fun buildDeleteAllRunsTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool(
-            "delete_all_runs",
-            "Delete all runs and their results. Useful for cleanup.",
-            """
+        val tool = McpSchema.Tool.builder()
+            .name("delete_all_runs")
+            .description("Delete all runs and their results. Useful for cleanup.")
+            .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {}
             }
-            """.trimIndent()
-        )
+            """.trimIndent())
+            .build()
 
         return McpServerFeatures.SyncToolSpecification(tool) { _, _ ->
             val result = toolHandlers.deleteAllRuns()
             McpSchema.CallToolResult(
-                listOf(McpSchema.TextContent(objectMapper.writeValueAsString(result))),
+                listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))),
                 false
             )
         }
@@ -245,13 +245,12 @@ class TurboMcpServer(private val port: Int = 31337) {
     }
 
     private fun buildRunsListResource(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource(
-            "turbo://runs",
-            "List of all Turbo Intruder runs",
-            "List all attack runs with their status and result counts",
-            "application/json",
-            null
-        )
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://runs")
+            .name("List of all Turbo Intruder runs")
+            .description("List all attack runs with their status and result counts")
+            .mimeType("application/json")
+            .build()
 
         return McpServerFeatures.SyncResourceSpecification(resource) { _, _ ->
             val result = resourceHandlers.listRuns()
@@ -259,20 +258,19 @@ class TurboMcpServer(private val port: Int = 31337) {
                 listOf(McpSchema.TextResourceContents(
                     "turbo://runs",
                     "application/json",
-                    objectMapper.writeValueAsString(result)
+                    jsonMapper.writeValueAsString(result)
                 ))
             )
         }
     }
 
     private fun buildRunStatusResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource(
-            "turbo://runs/{run_id}",
-            "Status of a specific run",
-            "Get detailed status of a specific run including running state, result count, and status message. Use 'current' for the most recent run.",
-            "application/json",
-            null
-        )
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://runs/{run_id}")
+            .name("Status of a specific run")
+            .description("Get detailed status of a specific run including running state, result count, and status message. Use 'current' for the most recent run.")
+            .mimeType("application/json")
+            .build()
 
         return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
             val runId = resourceHandlers.parseRunId(request.uri())
@@ -281,20 +279,19 @@ class TurboMcpServer(private val port: Int = 31337) {
                 listOf(McpSchema.TextResourceContents(
                     request.uri(),
                     "application/json",
-                    objectMapper.writeValueAsString(result)
+                    jsonMapper.writeValueAsString(result)
                 ))
             )
         }
     }
 
     private fun buildRunResultsResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource(
-            "turbo://runs/{run_id}/results",
-            "Results from a run",
-            "Get paginated results from a run. Supports query params: sort_by (id|status|length|time|wordcount), descending (true|false), limit, offset",
-            "application/json",
-            null
-        )
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://runs/{run_id}/results")
+            .name("Results from a run")
+            .description("Get paginated results from a run. Supports query params: sort_by (id|status|length|time|wordcount), descending (true|false), limit, offset")
+            .mimeType("application/json")
+            .build()
 
         return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
             val uri = request.uri()
@@ -311,20 +308,19 @@ class TurboMcpServer(private val port: Int = 31337) {
                 listOf(McpSchema.TextResourceContents(
                     uri,
                     "application/json",
-                    objectMapper.writeValueAsString(result)
+                    jsonMapper.writeValueAsString(result)
                 ))
             )
         }
     }
 
     private fun buildRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource(
-            "turbo://runs/{run_id}/requests/{id}",
-            "Details of a specific request",
-            "Get full request and response details for a specific result item",
-            "application/json",
-            null
-        )
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://runs/{run_id}/requests/{id}")
+            .name("Details of a specific request")
+            .description("Get full request and response details for a specific result item")
+            .mimeType("application/json")
+            .build()
 
         return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
             val uri = request.uri()
@@ -335,7 +331,7 @@ class TurboMcpServer(private val port: Int = 31337) {
                 listOf(McpSchema.TextResourceContents(
                     uri,
                     "application/json",
-                    objectMapper.writeValueAsString(result)
+                    jsonMapper.writeValueAsString(result)
                 ))
             )
         }

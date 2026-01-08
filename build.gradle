@@ -52,7 +52,7 @@ dependencies {
     // implementation files('http2-spike-enhanced-obfuscated.jar') // used for research only
 
     // MCP Server
-    implementation 'io.modelcontextprotocol.sdk:mcp:0.10.0'
+    implementation 'io.modelcontextprotocol.sdk:mcp:0.17.0'
 
     // Embedded Jetty for MCP HTTP transport
     implementation 'org.eclipse.jetty.ee10:jetty-ee10-servlet:12.0.14'
