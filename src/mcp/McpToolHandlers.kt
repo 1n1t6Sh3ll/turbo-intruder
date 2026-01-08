@@ -13,7 +13,7 @@ class McpToolHandlers(private val manager: RunManager) {
     ): Map<String, Any?> {
         val run = manager.startRun()
         launchRun(run, script, baseRequest, endpoint, baseInput)
-        return mapOf("status" to "started")
+        return mapOf("status" to "started", "run_id" to run.id)
     }
 
     fun startConcurrentRun(
@@ -56,18 +56,22 @@ class McpToolHandlers(private val manager: RunManager) {
             .substringBefore("/")
 
         thread {
-            evalJython(
-                code = script,
-                baseRequest = baseRequest,
-                rawRequest = baseRequest.toByteArray(Charsets.ISO_8859_1),
-                endpoint = endpoint,
-                host = host,
-                baseInput = baseInput,
-                store = run.store,
-                handler = run.handler,
-                reqs = null,
-                requestTable = null
-            )
+            try {
+                evalJython(
+                    code = script,
+                    baseRequest = baseRequest,
+                    rawRequest = baseRequest.toByteArray(Charsets.ISO_8859_1),
+                    endpoint = endpoint,
+                    host = host,
+                    baseInput = baseInput,
+                    store = run.store,
+                    handler = run.handler,
+                    reqs = null,
+                    requestTable = null
+                )
+            } catch (e: Exception) {
+                System.err.println("Run ${run.id} failed: ${e.message}")
+            }
         }
     }
 }
