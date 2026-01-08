@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.modelcontextprotocol.server.McpServer
 import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpSyncServer
-import io.modelcontextprotocol.server.transport.StdioServerTransportProvider
+import io.modelcontextprotocol.server.transport.HttpServletSseServerTransportProvider
 import io.modelcontextprotocol.spec.McpSchema
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler
+import org.eclipse.jetty.ee10.servlet.ServletHolder
+import org.eclipse.jetty.server.Server
+import org.eclipse.jetty.server.ServerConnector
 
 class TurboMcpServer(private val port: Int = 31337) {
 
@@ -14,10 +18,31 @@ class TurboMcpServer(private val port: Int = 31337) {
     val resourceHandlers = McpResourceHandlers(manager)
 
     private var server: McpSyncServer? = null
+    private var jettyServer: Server? = null
     private val objectMapper = ObjectMapper()
 
     fun start() {
-        val transportProvider = StdioServerTransportProvider(objectMapper)
+        // Create Jetty server on specified port
+        val jetty = Server()
+        val connector = ServerConnector(jetty)
+        connector.host = "127.0.0.1"
+        connector.port = port
+        jetty.addConnector(connector)
+
+        // Create the MCP SSE transport provider
+        val transportProvider = HttpServletSseServerTransportProvider.builder()
+            .objectMapper(objectMapper)
+            .build()
+
+        // Set up servlet context
+        val context = ServletContextHandler(ServletContextHandler.SESSIONS)
+        context.contextPath = "/"
+        context.addServlet(ServletHolder(transportProvider), "/*")
+        jetty.handler = context
+
+        // Start Jetty
+        jetty.start()
+        jettyServer = jetty
 
         server = McpServer.sync(transportProvider)
             .serverInfo("turbo-intruder", "1.0.0")
@@ -34,6 +59,8 @@ class TurboMcpServer(private val port: Int = 31337) {
     fun stop() {
         server?.close()
         server = null
+        jettyServer?.stop()
+        jettyServer = null
     }
 
     private fun buildToolSpecifications(): List<McpServerFeatures.SyncToolSpecification> {
