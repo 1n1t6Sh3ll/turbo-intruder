@@ -7,10 +7,19 @@ import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpSyncServer
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider
 import io.modelcontextprotocol.spec.McpSchema
+import jakarta.servlet.Filter
+import jakarta.servlet.FilterChain
+import jakarta.servlet.ServletRequest
+import jakarta.servlet.ServletResponse
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
+import org.eclipse.jetty.ee10.servlet.FilterHolder
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler
 import org.eclipse.jetty.ee10.servlet.ServletHolder
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
+import java.util.EnumSet
+import jakarta.servlet.DispatcherType
 
 class TurboMcpServer(private val port: Int = 31338) {
 
@@ -44,12 +53,20 @@ class TurboMcpServer(private val port: Int = 31338) {
         // Create the MCP streaming HTTP transport provider
         val transportProvider = HttpServletStreamableServerTransportProvider.builder()
             .jsonMapper(jsonMapper)
-            .mcpEndpoint("/mcp")
+            .mcpEndpoint("/")
             .build()
 
         // Set up servlet context
         val context = ServletContextHandler(ServletContextHandler.SESSIONS)
         context.contextPath = "/"
+
+        // Add Host header validation filter to prevent DNS rebinding attacks
+        context.addFilter(
+            FilterHolder(HostValidationFilter()),
+            "/*",
+            EnumSet.of(DispatcherType.REQUEST)
+        )
+
         context.addServlet(ServletHolder(transportProvider), "/*")
         jetty.handler = context
 
@@ -58,7 +75,7 @@ class TurboMcpServer(private val port: Int = 31338) {
         jettyServer = jetty
 
         server = McpServer.sync(transportProvider)
-            .serverInfo("turbo-intruder", "1.0.0")
+            .serverInfo("turbo-simulator", "1.0.0")
             .capabilities(McpSchema.ServerCapabilities.builder()
                 .tools(true)  // listChanged
                 .resources(true, true)  // subscribe, listChanged
@@ -452,6 +469,33 @@ class TurboMcpServer(private val port: Int = 31338) {
                     ))
                 )
             }
+        }
+    }
+}
+
+/**
+ * Filter that validates the Host header to prevent DNS rebinding attacks.
+ * Only allows requests with Host header set to localhost or 127.0.0.1.
+ */
+private class HostValidationFilter : Filter {
+    companion object {
+        private val ALLOWED_HOSTS = setOf(
+            "localhost",
+            "127.0.0.1"
+        )
+    }
+
+    override fun doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain) {
+        val httpRequest = request as HttpServletRequest
+        val httpResponse = response as HttpServletResponse
+
+        val host = httpRequest.getHeader("Host")?.lowercase()?.substringBefore(":") ?: ""
+
+        if (host in ALLOWED_HOSTS) {
+            chain.doFilter(request, response)
+        } else {
+            httpResponse.status = HttpServletResponse.SC_FORBIDDEN
+            httpResponse.writer.write("Forbidden: Invalid Host header")
         }
     }
 }
