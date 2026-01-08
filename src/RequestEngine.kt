@@ -23,7 +23,7 @@ abstract class RequestEngine: IExtensionStateListener {
     val userState = HashMap<String, Any>()
     val lastRequestID = AtomicInteger(0)
     var connections = AtomicInteger(0)
-    val attackState = AtomicInteger(0) // 0 = connecting, 1 = live, 2 = fully queued, 3 = cancelled, 4 = completed
+    val runState = AtomicInteger(0) // 0 = connecting, 1 = live, 2 = fully queued, 3 = cancelled, 4 = completed
     lateinit var completedLatch: CountDownLatch
     private val baselines = LinkedList<SafeResponseVariations>()
     val retries = AtomicInteger(0)
@@ -46,8 +46,8 @@ abstract class RequestEngine: IExtensionStateListener {
     init {
         lastLife = System.currentTimeMillis()
 
-        if (attackState.get() == 3) {
-            throw Exception("You cannot create a new request engine for a cancelled attack")
+        if (runState.get() == 3) {
+            throw Exception("You cannot create a new request engine for a cancelled run")
         }
 
         if (Utils.gotBurp) {
@@ -144,15 +144,15 @@ abstract class RequestEngine: IExtensionStateListener {
                 }
 
                 if (this is ThreadedRequestEngine && request.gate!!.remaining.get() > this.threads) {
-                    throw Exception("You have queued more gated requests than concurrentConnections, so your attack will deadlock. Consider increasing concurrentConnections")
+                    throw Exception("You have queued more gated requests than concurrentConnections, so your run will deadlock. Consider increasing concurrentConnections")
                 }
             }
         }
 
-        val state = attackState.get()
+        val state = runState.get()
 
         if (state > 2) {
-            throw IllegalStateException("Cannot queue any more items - the attack has finished")
+            throw IllegalStateException("Cannot queue any more items - the run has finished")
         }
 
         var timeout = 1800L
@@ -162,21 +162,21 @@ abstract class RequestEngine: IExtensionStateListener {
 
         var queued = false
         var attempt = 0L
-        while (!queued && attackState.get() <= 2 && attempt < timeout) {
+        while (!queued && runState.get() <= 2 && attempt < timeout) {
             queued = requestQueue.offer(request, 1, TimeUnit.SECONDS)
             attempt += 1
         }
 
         if (!queued) {
             if (state == 0 && requestQueue.size == 100) {
-                Utils.out("Looks like a non-streaming attack, unlimiting the queue")
+                Utils.out("Looks like a non-streaming run, unlimiting the queue")
                 requestQueue = LinkedBlockingQueue(requestQueue)
             }
             else if (attempt == timeout) {
                 Utils.out("Timeout queuing request. Aborting.")
                 this.cancel()
             } else {
-                // the attack has been cancelled so we don't need to do anything
+                // the run has been cancelled so we don't need to do anything
             }
         }
     }
@@ -189,18 +189,18 @@ abstract class RequestEngine: IExtensionStateListener {
         floodgates[gateName]!!.open()
     }
 
-    fun shouldAbandonAttack(): Boolean {
+    fun shouldAbandonRun(): Boolean {
         if (Utils.unloaded) {
             return true
         }
         if (Thread.currentThread().isInterrupted) {
             return true
         }
-        if (attackState.get() >= 3) {
+        if (runState.get() >= 3) {
             return true
         }
         if (idleTimeout > 0 && System.currentTimeMillis() > lastLife + idleTimeout) {
-            Utils.out("Cancelling attack due to total timeout exceeded: "+ idleTimeout)
+            Utils.out("Cancelling run due to total timeout exceeded: "+ idleTimeout)
             cancel()
             return true
         }
@@ -216,32 +216,32 @@ abstract class RequestEngine: IExtensionStateListener {
 
 
     open fun showStats(timeout: Int = -1) {
-        if (attackState.get() == 3) {
+        if (runState.get() == 3) {
             return
         }
 
         var success = true
-        attackState.set(2)
+        runState.set(2)
         if (timeout > 0) {
             success = completedLatch.await(timeout.toLong(), TimeUnit.SECONDS)
         }
         else {
-            while (completedLatch.count > 0 && !Utils.unloaded && attackState.get() < 3) {
+            while (completedLatch.count > 0 && !Utils.unloaded && runState.get() < 3) {
                 completedLatch.await(10, TimeUnit.SECONDS)
             }
         }
 
-        if (attackState.get() == 3) {
+        if (runState.get() == 3) {
             return
         }
 
         if (!success) {
-            Utils.out("Aborting attack due to timeout")
-            attackState.set(3)
+            Utils.out("Aborting run due to timeout")
+            runState.set(3)
         }
         else {
-            Utils.err("Completed attack on " +target)
-            attackState.set(4)
+            Utils.err("Completed run on " +target)
+            runState.set(4)
         }
         showSummary()
     }
@@ -251,9 +251,9 @@ abstract class RequestEngine: IExtensionStateListener {
             Utils.callbacks.removeExtensionStateListener(this)
         }
 
-        if (attackState.get() != 3) {
-            attackState.set(3)
-            Utils.out("Cancelled attack")
+        if (runState.get() != 3) {
+            runState.set(3)
+            Utils.out("Cancelled run")
 
             // Wait for all worker threads to finish their callbacks before calculating anomaly rankings
             // This prevents ConcurrentModificationException when iterating the request list
@@ -282,15 +282,15 @@ abstract class RequestEngine: IExtensionStateListener {
         Utils.err("Sent ${requests.toInt()} requests over ${connections.toInt()} connections in ${duration / 1000000000} seconds")
         Utils.err(String.format("RPS: %.0f\n", requests / ceil((duration / 1000000000).toDouble())))
 
-        // Calculate anomaly rankings when attack is stopped or completed
-        if (attackState.get() >= 3) {
+        // Calculate anomaly rankings when run is stopped or completed
+        if (runState.get() >= 3) {
             // All worker threads have finished (waited in cancel() or showStats())
             // so it's safe to iterate the request list for anomaly ranking
             calculateAnomalyRankings()
         }
 
-        // Clean up memory when attack is completed
-        if (attackState.get() >= 4) {
+        // Clean up memory when run is completed
+        if (runState.get() >= 4) {
             cleanup()
         }
     }
@@ -371,7 +371,7 @@ abstract class RequestEngine: IExtensionStateListener {
         val requests = successfulRequests.get().toFloat()
         val nextWord = requestQueue.peek()?.words?.joinToString(separator="/")
         val statusString = String.format("Reqs: %d | Queued: %d | Duration: %d | RPS: %.0f | Connections: %d | Retries: %d | Fails: %d | Next: %s", requests.toInt(), requestQueue.count(), duration, requests / duration, connections.get(), retries.get(), permaFails.get(), nextWord)
-        val state = attackState.get()
+        val state = runState.get()
         return when {
             state < 3 -> statusString
             state == 3 -> statusString + " | Cancelled"

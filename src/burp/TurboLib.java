@@ -15,7 +15,7 @@ public class TurboLib {
 
     static TurboHelper createConnectionIfRequired(IHttpService service, byte[] req) {
         TurboHelper connection;
-        if (cachedConnections.containsKey(service) && !cachedConnections.get(service).engine.shouldAbandonAttack()) {
+        if (cachedConnections.containsKey(service) && !cachedConnections.get(service).engine.shouldAbandonRun()) {
             connection = cachedConnections.get(service);
         } else {
             boolean forceH2 = Utilities.isHTTP2(req);

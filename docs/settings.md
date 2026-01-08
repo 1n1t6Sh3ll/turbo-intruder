@@ -15,7 +15,7 @@ engine = RequestEngine(
     maxQueueSize=100,            # Max queued requests
     timeout=10,                  # Response timeout (seconds)
     maxRetriesPerRequest=3,      # Retry failed requests
-    idleTimeout=0,               # Total attack timeout (ms, 0=none)
+    idleTimeout=0,               # Total run timeout (ms, 0=none)
     readCallback=None,           # Partial response callback
     readSize=1024,               # Read buffer size
     resumeSSL=True,              # Resume SSL sessions
@@ -35,7 +35,7 @@ engine = RequestEngine(
 | `maxQueueSize` | int | 100 | Queue limit (blocks when full) |
 | `timeout` | int | 10 | Response timeout in seconds |
 | `maxRetriesPerRequest` | int | 3 | Retries for failed requests |
-| `idleTimeout` | int | 0 | Attack timeout in ms (0=disabled) |
+| `idleTimeout` | int | 0 | Run timeout in ms (0=disabled) |
 | `autoStart` | bool | True | Start immediately vs manual `engine.start()` |
 
 ### Engine-Specific Notes
@@ -117,7 +117,7 @@ table.setSortOrder(column, descending)
 | `column` | int | Column index (0-based) |
 | `descending` | bool | `True` for descending, `False` for ascending |
 
-Setting a custom sort order also disables the automatic sort-by-anomaly-rank on attack completion.
+Setting a custom sort order also disables the automatic sort-by-anomaly-rank on run completion.
 
 ```python
 # Sort by first column (status) in ascending order
@@ -128,7 +128,7 @@ table.setSortOrder(0, False)
 
 ```python
 handler.setMessage("Status text")  # Update status bar
-handler.abort()                     # Cancel attack
+handler.abort()                     # Cancel run
 ```
 
 ## Engine Methods
@@ -136,7 +136,7 @@ handler.abort()                     # Cancel attack
 ```python
 engine.start(timeout=5)     # Manual start (if autoStart=False)
 engine.complete(timeout=-1) # Wait for completion
-engine.cancel()             # Cancel attack
+engine.cancel()             # Cancel run
 engine.openGate('name')     # Open a gate
 engine.userState            # Dict for custom state
 engine.applySetting(name, value)  # Internal settings

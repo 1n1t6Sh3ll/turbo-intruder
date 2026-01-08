@@ -17,7 +17,7 @@ class TurboHelper implements AutoCloseable {
         return service;
     }
 
-    private int attacks = 0;
+    private int runs = 0;
 
     private IHttpService service;
     private int requestTimeout;
@@ -104,8 +104,8 @@ class TurboHelper implements AutoCloseable {
         CountDownLatch responseLock = new CountDownLatch(reqs.size());
         String gateName = null;
         if (reqs.size() > 1) {
-            gateName = String.valueOf(attacks);
-            attacks += 1;
+            gateName = String.valueOf(runs);
+            runs += 1;
         }
 
         int index = 0;

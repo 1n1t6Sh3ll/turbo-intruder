@@ -66,7 +66,7 @@ In `handleResponse(req, interesting)`:
 
 | Engine | Protocol | Use Case |
 |--------|----------|----------|
-| `Engine.THREADED` | HTTP/1.1 | Fast custom stack, most attacks |
+| `Engine.THREADED` | HTTP/1.1 | Fast custom stack, most use cases |
 | `Engine.BURP` | HTTP/1.1 | Needs Burp's proxy/auth |
 | `Engine.BURP2` | HTTP/2 | HTTP/2, single-packet attacks |
 
@@ -79,7 +79,7 @@ See [engines.md](engines.md) for details.
 | `target` | Target with `.endpoint`, `.req` |
 | `table` | Results table (`table.add(req)`) |
 | `wordlists` | Access `.clipboard`, `.observedWords`, `.bruteforce` |
-| `handler` | Attack handler (`.setMessage()`, `.abort()`) |
+| `handler` | Run handler (`.setMessage()`, `.abort()`) |
 | `api` | Montoya API (Burp integration) |
 | `callbacks` | Legacy Burp callbacks |
 

@@ -52,10 +52,10 @@
 //    }
 //
 //    private fun processRequests() {
-//        while (!Utils.unloaded && !shouldAbandonAttack()) {
+//        while (!Utils.unloaded && !shouldAbandonRun()) {
 //            val resp: Request? = responseQueue.poll(100, TimeUnit.MILLISECONDS) ?: continue
 //            successfulRequests.getAndIncrement()
-//            while (resp!!.sent == 0L && !shouldAbandonAttack()) {
+//            while (resp!!.sent == 0L && !shouldAbandonRun()) {
 //                Thread.sleep(100)
 //            }
 //            resp.time = (resp.arrival - resp.sent) / 1000
@@ -68,27 +68,27 @@
 //    private fun sendRequests(retryQueue: LinkedBlockingQueue<Request>) {
 //        var responseStreamHandler: SpikeConnection? = null
 //
-//        while (!Utils.unloaded && !shouldAbandonAttack()) {
+//        while (!Utils.unloaded && !shouldAbandonRun()) {
 //            val socket = socketFactory.create(target.host, 443)
 //            socket.soTimeout = 10000
 //            socket.tcpNoDelay = false
 //            responseStreamHandler = SpikeConnection(this)
 //            val connectionID = connections.incrementAndGet()
 //            val connectionFactory = ConnectionFactory.create(threadLauncher, responseStreamHandler)
-//            val connection = connectionFactory.createConnection(socket) { } // callback is invoked when connection is killed
+//            val connection = connectionFactory.createConnection(socket) { } // callback is invoked when connection is closed
 //            val frameFactory: RequestFrameFactory
 //            if (fatPacket) {
 //                frameFactory = RequestFrameFactory.createDefaultRequestFrameFactory(connection.negotiatedMaximumFrameSize())
 //            } else {
 //                frameFactory = RequestFrameFactory.createSmallFinalDataFrameRequestFrameFactory(connection.negotiatedMaximumFrameSize())
 //                //RequestFrameFactory.
-//                // frameFactory = RequestFrameFactory.createSmallTrailingHeaderRequestFrameFactory(connection.negotiatedMaximumFrameSize()) // this approach sucks
+//                // frameFactory = RequestFrameFactory.createSmallTrailingHeaderRequestFrameFactory(connection.negotiatedMaximumFrameSize())
 //            }
 //
 //            var requestsSent = 0
 //
 //            try {
-//                while (requestsSent < requestsPerConnection && !shouldAbandonAttack()) {
+//                while (requestsSent < requestsPerConnection && !shouldAbandonRun()) {
 //                    if (responseStreamHandler.inflight.size >= 1){
 //                        // todo make this configurable
 //                        Thread.sleep(10)
@@ -100,7 +100,7 @@
 //                        req = requestQueue.poll(100, TimeUnit.MILLISECONDS)
 //                    }
 //                    if (req == null) {
-//                        if (attackState.get() == 2) {
+//                        if (runState.get() == 2) {
 //                            waitForPendingRequests(responseStreamHandler)
 //                            return
 //                        }
@@ -121,11 +121,11 @@
 //                    req.gate!!.reportReadyWithoutWaiting()
 //                    req.connectionID = connectionID
 //                    gatedReqs.add(req)
-//                    while ((!req.gate!!.fullyQueued.get() || responseStreamHandler.inflight.size != 0) && !shouldAbandonAttack()) {
+//                    while ((!req.gate!!.fullyQueued.get() || responseStreamHandler.inflight.size != 0) && !shouldAbandonRun()) {
 //                        Thread.sleep(10)
 //                    }
 //
-//                    while (!req.gate!!.isOpen.get() && !shouldAbandonAttack()) {
+//                    while (!req.gate!!.isOpen.get() && !shouldAbandonRun()) {
 //                        //Utils.out("Waiting on ${req.gate!!.remaining.get()} signals for gate to open on ${req.gate!!.name}")
 //                        val nextReq = requestQueue.poll(50, TimeUnit.MILLISECONDS) ?: throw RuntimeException("Gate deadlock")
 //                        if (nextReq.gate!!.name != req.gate!!.name) {
@@ -264,7 +264,7 @@
 //
 //    override fun start(timeout: Int) {
 //        // todo wait for connection?
-//        attackState.set(1)
+//        runState.set(1)
 //        start = System.nanoTime()
 //    }
 //

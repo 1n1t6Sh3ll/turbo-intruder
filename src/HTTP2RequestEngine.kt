@@ -41,7 +41,7 @@ open class HTTP2RequestEngine(url: String, val threads: Int, maxQueueSize: Int, 
         // showStats changes state from 1 to 2
         // then waits on the completedLatch to hit 3
         H2Connection.debug("Connection management thread starting")
-        while (attackState.get() < 3) {
+        while (runState.get() < 3) {
             for (i in 1..threads) {
                 val con = connectionPool[i - 1]
                 if (con.done) {
@@ -57,7 +57,7 @@ open class HTTP2RequestEngine(url: String, val threads: Int, maxQueueSize: Int, 
 //                }
 
                 if (con.state == H2Connection.CLOSED) {
-                    if (con.hasInflightRequests() || con.seedQueue.size > 0 || attackState.get() < 3) {
+                    if (con.hasInflightRequests() || con.seedQueue.size > 0 || runState.get() < 3) {
 
                         val seedQueue = LinkedBlockingQueue<Request>()
                         if (con.hasInflightRequests()) {
@@ -82,7 +82,7 @@ open class HTTP2RequestEngine(url: String, val threads: Int, maxQueueSize: Int, 
     }
 
     override fun start(timeout: Int) {
-        attackState.set(1)
+        runState.set(1)
         start = System.nanoTime()
     }
 
@@ -93,7 +93,7 @@ open class HTTP2RequestEngine(url: String, val threads: Int, maxQueueSize: Int, 
 
 //    fun queue(request: ByteArray) {
 //        if (fullyQueued) {
-//            throw IllegalStateException("Cannot queue any more items - the attack has finished")
+//            throw IllegalStateException("Cannot queue any more items - the run has finished")
 //        }
 //        val queued = requestQueue.offer(request, 1, TimeUnit.SECONDS)
 //        if (!queued) {

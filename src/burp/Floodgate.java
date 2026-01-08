@@ -30,7 +30,7 @@ public class Floodgate {
 
         if (remaining.get() > 0) {
             //new Thread(() -> {
-                while (remaining.get() > 0 && engine.getAttackState().get() < 3) {
+                while (remaining.get() > 0 && engine.getRunState().get() < 3) {
                     //Utils.out("Threads remaining: "+remaining.get());
                     synchronized (remaining) {
                         try {

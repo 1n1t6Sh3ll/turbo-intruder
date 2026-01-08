@@ -1,7 +1,7 @@
 package burp
 
 
-class AttackHandler (){
+class RunHandler (){
     private var running = false
     private var engine: RequestEngine? = null
     private var statusOverride: String? = null
@@ -22,7 +22,7 @@ class AttackHandler (){
         if (engine == null) {
             return false
         }
-        return engine!!.attackState.get() >= 3
+        return engine!!.runState.get() >= 3
     }
 
     fun setRequestEngine(engine: RequestEngine) {

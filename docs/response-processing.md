@@ -118,7 +118,7 @@ def handleResponse(req, interesting):
 
 ## Completed Callback
 
-Process all results after the attack:
+Process all results after the run:
 
 ```python
 def completed(reqsFromTable):

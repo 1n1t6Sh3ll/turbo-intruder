@@ -6,7 +6,7 @@ def queueRequests(target, wordlists):
     RIGHT_PAYLOAD = 'changeme2' # you can use $randomplz to bypass caching
 
     REPEATS = 100 # more repeats takes longer, but reduces chance of incorrect results
-    DELAY  = 0.2 # timing attacks don't work if you trigger a server rate-limit.
+    DELAY  = 0.2 # timing-based tests don't work if you trigger a server rate-limit.
 
     engineType = Engine.BURP
     connections = 2
@@ -23,21 +23,21 @@ def queueRequests(target, wordlists):
                            timeout=3
                            )
 
-    attack = target.req
+    request = target.req
 
 
-    left_attack =  attack.replace('%s', LEFT_PAYLOAD)
-    right_attack = attack.replace('%s', RIGHT_PAYLOAD)
+    left_request =  request.replace('%s', LEFT_PAYLOAD)
+    right_request = request.replace('%s', RIGHT_PAYLOAD)
 
     # alternate order to prevent order-FPs - see 'sticky ordering problem'
     for i in range(REPEATS):
         gate_id = str(i)
         if (i % 2 == 1):
-            engine.queue(left_attack, gate=gate_id, label='left-first')
-            engine.queue(right_attack, gate=gate_id, label='right-second')
+            engine.queue(left_request, gate=gate_id, label='left-first')
+            engine.queue(right_request, gate=gate_id, label='right-second')
         else:
-            engine.queue(right_attack, gate=gate_id, label='right-first')
-            engine.queue(left_attack, gate=gate_id, label='left-second')
+            engine.queue(right_request, gate=gate_id, label='right-first')
+            engine.queue(left_request, gate=gate_id, label='left-second')
 
         engine.openGate(gate_id)
         time.sleep(DELAY*2)

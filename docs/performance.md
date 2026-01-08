@@ -1,6 +1,6 @@
 # Performance Tuning
 
-How to maximize requests per second (RPS) for high-volume attacks.
+How to maximize requests per second (RPS) for high-volume runs.
 
 ## Quick Checklist
 
@@ -131,7 +131,7 @@ req = target.req.replace('\r\n\r\n', '\r\nRange: bytes=0-500\r\n\r\n')
 
 ## Memory Management
 
-For million+ request attacks, memory management is critical.
+For million+ request runs, memory management is critical.
 
 ### Filter Before Adding to Table
 
@@ -210,7 +210,7 @@ java -jar turbo-intruder.jar script.py
 
 ## Server-Side Bottlenecks
 
-Your attack speed is limited by the slowest component:
+Your run speed is limited by the slowest component:
 - **Network latency** - use closer server
 - **Server processing** - nothing you can do
 - **Rate limiting** - reduce concurrency or add delays

@@ -2,7 +2,7 @@ def queueRequests(target, wordlists):
     engine = RequestEngine(endpoint=target.endpoint)
 
     # sort by the first column in descending order
-    # note this also disables the auto-sort by anomaly rank on attack completion
+    # note this also disables the auto-sort by anomaly rank on run completion
     table.setSortOrder(0, False)
 
     while True:

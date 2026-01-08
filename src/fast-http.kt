@@ -57,10 +57,10 @@ class Target(val req: String, val rawreq: ByteArray, val endpoint: String, val b
 
 class Wordlist(val bruteforce: Bruteforce, val observedWords: ConcurrentHashMap.KeySetView<String, Boolean>, val clipboard: ArrayList<String>)
 
-fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoint: String, host: String, baseInput: String, store: ResultStore, handler: AttackHandler, reqs: MutableList<HttpRequestResponse>?, requestTable: RequestTable?) {
+fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoint: String, host: String, baseInput: String, store: ResultStore, handler: RunHandler, reqs: MutableList<HttpRequestResponse>?, requestTable: RequestTable?) {
     val pyInterp = PythonInterpreter() // todo add path to bs4
     try {
-        Utils.out("Starting attack...")
+        Utils.out("Starting run...")
         handler.code = code
         handler.baseRequest = baseRequest
         handler.rawRequest = rawRequest
@@ -94,8 +94,8 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
     catch (ex: Exception) {
         var error = ex
         var stackTrace = errorToStacktrace(error)
-        if (stackTrace.contains("Cannot queue any more items - the attack has finished")) {
-            Utils.out("Attack aborted with items waiting to be queued.")
+        if (stackTrace.contains("Cannot queue any more items - the run has finished")) {
+            Utils.out("Run aborted with items waiting to be queued.")
             try {
                 pyInterp.exec("completed(store.getAllRquests())".trimMargin())
                 handler.abort()
@@ -363,18 +363,18 @@ class TurboIntruderFrame(inputReq: IHttpRequestResponse, val selectionBounds: In
             pane.bottomComponent = panel
 
 
-            val button = JButton("Attack")
+            val button = JButton("Run")
             panel.add(button, BorderLayout.SOUTH)
 
             val turboSize = Utils.getTurboSize()
             messageEditor.component.preferredSize = Dimension(turboSize.width, 200)
             panel.preferredSize = Dimension(turboSize.width, turboSize.height-200)
 
-            var handler = AttackHandler()
+            var handler = RunHandler()
             var resultStore: ResultStore? = null
             var requestTable: RequestTable? = null
 
-            class ToggleAttack(): ActionListener {
+            class ToggleRun(): ActionListener {
                 override fun actionPerformed(e: ActionEvent?) {
                     thread {
                         when {
@@ -386,14 +386,14 @@ class TurboIntruderFrame(inputReq: IHttpRequestResponse, val selectionBounds: In
                                 handler.abort()
                                 requestTable?.clear()
                                 resultStore?.clear()
-                                handler = AttackHandler()
+                                handler = RunHandler()
                                 resultStore = null
                                 requestTable = null
                                 SwingUtilities.invokeLater {
                                     panel.add(button, BorderLayout.SOUTH)
                                     pane.bottomComponent = panel
                                     pane.setDividerLocation(0.25)
-                                    button.text = "Attack"
+                                    button.text = "Run"
                                     button.requestFocusInWindow()
                                     pane.rootPane.defaultButton = button
                                     title = "Turbo Intruder - " + req.httpService.host
@@ -444,23 +444,23 @@ class TurboIntruderFrame(inputReq: IHttpRequestResponse, val selectionBounds: In
                     }
                 }
             }
-            button.addActionListener(ToggleAttack())
+            button.addActionListener(ToggleRun())
 
             button.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
                 KeyStroke.getKeyStroke(
                     "control ENTER"
-                ), "toggleAttack"
+                ), "toggleRun"
             )
 
             button.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(
                 KeyStroke.getKeyStroke(
                     "control SPACE"
-                ), "toggleAttack"
+                ), "toggleRun"
             )
 
-            button.getActionMap().put("toggleAttack", object : AbstractAction() {
+            button.getActionMap().put("toggleRun", object : AbstractAction() {
                 override fun actionPerformed(e: ActionEvent) {
-                    ToggleAttack().actionPerformed(e)
+                    ToggleRun().actionPerformed(e)
                 }
             })
 
@@ -539,9 +539,9 @@ fun main(args : Array<String>) {
             endpoint = args[2]
             baseInput = args[3]
         }
-        val attackHandler = AttackHandler()
+        val runHandler = RunHandler()
         Runtime.getRuntime().addShutdownHook(Thread {
-            Utils.out(attackHandler.statusString())
+            Utils.out(runHandler.statusString())
         })
         Utils.out("Please note that Turbo Intruder's SSL/TLS handling may differ slightly when run outside Burp Suite.")
         if(!req.contains("\r\n")) {
@@ -549,7 +549,7 @@ fun main(args : Array<String>) {
             req = req.replace("\n", "\r\n")
         }
         val store = ResultStore()
-        evalJython(code, req, rawReq, endpoint, "", baseInput, store, attackHandler, mutableListOf(), null)
+        evalJython(code, req, rawReq, endpoint, "", baseInput, store, runHandler, mutableListOf(), null)
 
         // Print results to console (replaces ConsolePrinter behavior)
         println("ID | Word | Status | Wordcount | Length | Time")

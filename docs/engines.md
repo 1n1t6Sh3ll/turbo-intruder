@@ -6,7 +6,7 @@ Turbo Intruder provides multiple HTTP engines for different scenarios.
 
 | Engine | Protocol | Speed | Reliability | Pipelining | Use Case |
 |--------|----------|-------|-------------|------------|----------|
-| `Engine.THREADED` | HTTP/1.1 | Extremely fast | Toggleable | Yes | Default, most attacks |
+| `Engine.THREADED` | HTTP/1.1 | Extremely fast | Toggleable | Yes | Default, most use cases |
 | `Engine.BURP` | HTTP/1.1 | Fast | Excellent | No | Proxy, auth, upstream |
 | `Engine.BURP2` | HTTP/2 | Extremely fast | Excellent | Automatic | HTTP/2, race conditions |
 
@@ -63,7 +63,7 @@ def handleRead(data):
 | `pauseTime` | Pause duration in ms (default 1000) |
 | `pauseMarker` | List of strings - pause after sending each marker |
 
-These enable request smuggling research and timing attacks by splitting request transmission.
+These enable request smuggling research and timing tests by splitting request transmission.
 
 **Features:**
 - Fastest option with HTTP/1.1 pipelining
@@ -78,7 +78,7 @@ These enable request smuggling research and timing attacks by splitting request 
 - Doesn't use Burp's proxy settings
 - No automatic authentication
 
-**Best for:** High-volume fuzzing, request smuggling research, timing attacks, maximum speed.
+**Best for:** High-volume fuzzing, request smuggling research, timing tests, maximum speed.
 
 ## Engine.BURP
 
@@ -110,7 +110,7 @@ engine = RequestEngine(endpoint=target.endpoint,
 
 ## Engine.BURP2
 
-Uses Burp Suite's HTTP/2 stack. Required for single-packet attacks.
+Uses Burp Suite's HTTP/2 stack. Required for single-packet attack.
 
 ```python
 engine = RequestEngine(endpoint=target.endpoint,
@@ -120,7 +120,7 @@ engine = RequestEngine(endpoint=target.endpoint,
 
 **Features:**
 - HTTP/2 multiplexing over single connection
-- Single-packet attacks: all gated requests sent in one TCP packet
+- Single-packet attack: all gated requests sent in one TCP packet
 - Uses Burp's upstream proxy settings
 - Automatic authentication handling
 
@@ -156,7 +156,7 @@ Host: example.com
 - `resumeSSL` not supported
 - `pauseBefore`/`pauseTime`/`pauseMarker` not supported
 
-**Best for:** HTTP/2 targets, race condition testing, single-packet attacks.
+**Best for:** HTTP/2 targets, race condition testing, single-packet attack.
 
 See [race-conditions.md](race-conditions.md) for single-packet attack examples.
 

@@ -1,6 +1,6 @@
 # Race Condition Testing
 
-Turbo Intruder supports gated requests for precise timing in race condition attacks.
+Turbo Intruder supports gated requests for precise timing in race condition testing.
 
 ## Basic Gated Requests
 
@@ -97,11 +97,11 @@ def queueRequests(target, wordlists):
 
         # Alternate order to prevent false positives
         if i % 2 == 1:
-            engine.queue(attack.replace('%s', 'payload1'), gate=gate_id, label='left')
-            engine.queue(attack.replace('%s', 'payload2'), gate=gate_id, label='right')
+            engine.queue(request.replace('%s', 'payload1'), gate=gate_id, label='left')
+            engine.queue(request.replace('%s', 'payload2'), gate=gate_id, label='right')
         else:
-            engine.queue(attack.replace('%s', 'payload2'), gate=gate_id, label='right')
-            engine.queue(attack.replace('%s', 'payload1'), gate=gate_id, label='left')
+            engine.queue(request.replace('%s', 'payload2'), gate=gate_id, label='right')
+            engine.queue(request.replace('%s', 'payload1'), gate=gate_id, label='left')
 
         engine.openGate(gate_id)
         time.sleep(0.2)  # Avoid rate limiting

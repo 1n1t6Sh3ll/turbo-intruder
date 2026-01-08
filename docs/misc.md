@@ -81,7 +81,7 @@ std = stddev(times)
 | `target` | obj | `.endpoint`, `.req`, `.baseInput` |
 | `wordlists` | obj | `.clipboard`, `.observedWords`, `.bruteforce` |
 | `table` | OutputHandler | Results table |
-| `handler` | AttackHandler | Attack control |
+| `handler` | RunHandler | Run control |
 | `callbacks` | IBurpExtenderCallbacks | Burp callbacks |
 | `helpers` | IExtensionHelpers | Burp helpers |
 | `api` | MontoyaApi | Montoya API |
@@ -99,7 +99,7 @@ target.baseInput # Original request before markers
 
 ```python
 handler.setMessage("Processing...")  # Update status bar
-handler.abort()                       # Cancel attack
+handler.abort()                       # Cancel run
 ```
 
 ## Engine User State
@@ -116,7 +116,7 @@ def handleResponse(req, interesting):
     req.engine.userState['counter'] += 1
 ```
 
-## Multi-Host Attacks
+## Multi-Host Runs
 
 Override endpoint per-request:
 

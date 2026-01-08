@@ -80,7 +80,7 @@ def handleResponse(req, interesting):
 
     if req.label and 'xyzz' in req.label and '302 OK' in req.response:
         if req.label not in req.response:
-            print 'success, aborting attack'
+            print 'success, aborting run'
             table.add(req)
             req.engine.cancel()
 

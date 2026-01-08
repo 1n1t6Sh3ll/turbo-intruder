@@ -44,7 +44,7 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
     }
 
     override fun start(timeout: Int) {
-        attackState.set(1)
+        runState.set(1)
         start = System.nanoTime()
     }
 
@@ -103,12 +103,12 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
 
     private fun sendRequests(service: IHttpService) {
         try {
-            while(attackState.get()<1) {
+            while(runState.get()<1) {
                 Thread.sleep(10)
             }
 
 
-            while(attackState.get() < 3 && !Utils.unloaded) {
+            while(runState.get() < 3 && !Utils.unloaded) {
 
                 try {
                 val requestGroup = getGatedRequests()
@@ -182,7 +182,7 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                         continue;
                     }
 
-                    if (attackState.get() == 2) {
+                    if (runState.get() == 2) {
                         return
                     } else {
                         continue

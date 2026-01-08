@@ -1,4 +1,4 @@
-# Please note the stats panel won't reflect reality on multi-host attacks
+# Please note the stats panel won't reflect reality on multi-host runs
 def queueRequests(target, wordlists):
     req = '''GET / HTTP/1.1
 Host: %s

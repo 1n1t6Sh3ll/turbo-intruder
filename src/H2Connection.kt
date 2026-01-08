@@ -198,7 +198,7 @@ class H2Connection(val target: URL, val seedQueue: Queue<Request>, private val r
 
 
     private fun checkState(): Int {
-        if (engine.attackState.get() >= 3) {
+        if (engine.runState.get() >= 3) {
             close()
         }
         return state
@@ -313,7 +313,7 @@ class H2Connection(val target: URL, val seedQueue: Queue<Request>, private val r
                 passResponseToStream(sizeBuffer + frameBuffer)
             }
         } catch (e: Exception) {
-            Utils.out("Killing read thread")
+            Utils.out("Stopping read thread")
             close()
         }
         debug("Closing read thread...")
@@ -340,7 +340,7 @@ class H2Connection(val target: URL, val seedQueue: Queue<Request>, private val r
         try {
             var completedSeedQueue = false
 
-            while (state == ALIVE && engine.attackState.get() < 3) {
+            while (state == ALIVE && engine.runState.get() < 3) {
 
                 // todo use a lock instead, should be faster
                 if (streams.size >= maxConcurrentStreams) {
@@ -359,7 +359,7 @@ class H2Connection(val target: URL, val seedQueue: Queue<Request>, private val r
                 if (completedSeedQueue) {
                     req = requestQueue.poll(1000, TimeUnit.MILLISECONDS)
                     if (req == null) {
-                        if (engine.attackState.get() == 2 && !hasInflightRequests()) {
+                        if (engine.runState.get() == 2 && !hasInflightRequests()) {
                             close()
                             done = true
                             return
@@ -392,7 +392,7 @@ class H2Connection(val target: URL, val seedQueue: Queue<Request>, private val r
                 }
             }
         } catch (e: Exception) {
-            Utils.out("Killing write thread")
+            Utils.out("Stopping write thread")
             close()
         } finally {
             engine.completedLatch.countDown()

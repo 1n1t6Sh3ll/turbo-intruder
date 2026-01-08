@@ -13,7 +13,7 @@ import javax.swing.table.DefaultTableCellRenderer
 import javax.swing.table.TableRowSorter
 
 
-class UpdateStatusbar(val message: JLabel, val handler: AttackHandler): ActionListener {
+class UpdateStatusbar(val message: JLabel, val handler: RunHandler): ActionListener {
     lateinit var timer: Timer
 
     override fun actionPerformed(e: ActionEvent?) {
@@ -33,7 +33,7 @@ interface OutputHandler {
     abstract fun getAllRquests(): List<Request>
 }
 
-class RequestTable(val store: ResultStore, val service: IHttpService, val handler: AttackHandler): JPanel() {
+class RequestTable(val store: ResultStore, val service: IHttpService, val handler: RunHandler): JPanel() {
     val model = RequestTableModel()
     val issueTable = JTable(model)
     val requestEditor: IMessageEditor
@@ -174,7 +174,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
         var lastKnownSize = 0
         var finishedAt: Long? = null
         val storePoller = javax.swing.Timer(100) {
-            // Stop polling 10 seconds after attack completes
+            // Stop polling 10 seconds after run completes
             if (handler.hasFinished()) {
                 if (finishedAt == null) {
                     finishedAt = System.currentTimeMillis()
@@ -257,7 +257,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
             val baseReq = StubRequest(Utils.stringToBytes(handler.baseRequest), service)
             val url = URL(service.protocol + "://" + service.host + ":" +service.port)
             val detail = "<b>Comment: "+comment+"</b><br/><br/><b>Status:</b> "+statusLabel.text + "<br/><br/>\n<pre>"+ handler.code.replace("<", "&lt;")+"</pre>\n"+htmlTable
-            val issue = TurboScanIssue(service, url, arrayOf<IHttpRequestResponse>(baseReq) + reqs.toTypedArray(), "Turbo Intruder Attack", detail, "Information", "Certain", "")
+            val issue = TurboScanIssue(service, url, arrayOf<IHttpRequestResponse>(baseReq) + reqs.toTypedArray(), "Turbo Intruder Finding", detail, "Information", "Certain", "")
             Utils.callbacks.addScanIssue(issue)
         }
         menu.add(createIssueButton)

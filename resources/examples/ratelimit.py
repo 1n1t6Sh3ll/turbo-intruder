@@ -1,5 +1,5 @@
 # Author: https://github.com/abiwaddell
-# Throttle the attack per-request, and per X requests.
+# Throttle the run per-request, and per X requests.
 # Full description at https://github.com/abiwaddell/Run-Pause-Resume
 import time
 
