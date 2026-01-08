@@ -526,7 +526,7 @@ class TurboIntruderFrame(inputReq: IHttpRequestResponse, val selectionBounds: In
 
 fun main(args : Array<String>) {
     if (args.contains("--mcp")) {
-        val server = mcp.TurboMcpServer(port = 31337)
+        val server = mcp.TurboMcpServer(port = 31338)
         server.start()
 
         Runtime.getRuntime().addShutdownHook(Thread {

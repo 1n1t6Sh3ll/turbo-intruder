@@ -12,7 +12,7 @@ import org.eclipse.jetty.ee10.servlet.ServletHolder
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
 
-class TurboMcpServer(private val port: Int = 31337) {
+class TurboMcpServer(private val port: Int = 31338) {
 
     private val manager = RunManager()
     val toolHandlers = McpToolHandlers(manager)
