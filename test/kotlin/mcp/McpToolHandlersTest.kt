@@ -76,6 +76,29 @@ class McpToolHandlersTest {
     }
 
     @Test
+    fun `setOrganizerNotes updates notes on item`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET / HTTP/1.1", "HTTP/1.1 200 OK", "Old note")
+        ))
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.setOrganizerNotes(1, "New note")
+
+        assertEquals("success", result["status"])
+        assertEquals("New note", fakeOrganizer.getNotes(1))
+    }
+
+    @Test
+    fun `setOrganizerNotes returns error for non-existent item`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.setOrganizerNotes(999, "Note")
+
+        assertEquals("not_found", result["error"])
+    }
+
+    @Test
     fun `startRun creates new run and returns status`() {
         val result = handlers.startRun(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
@@ -140,10 +163,12 @@ data class FakeOrganizerItem(
     val id: Int,
     val request: String,
     val response: String,
-    val notes: String = ""
+    var notes: String = ""
 )
 
-class FakeOrganizerProvider(private val items: List<FakeOrganizerItem>) : OrganizerProvider {
+class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider {
+    private val items = items.toMutableList()
+
     override fun getItems(): List<OrganizerItemData> {
         return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
     }
@@ -151,4 +176,12 @@ class FakeOrganizerProvider(private val items: List<FakeOrganizerItem>) : Organi
     override fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData> {
         return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
     }
+
+    override fun setNotes(id: Int, notes: String): Boolean {
+        val item = items.find { it.id == id } ?: return false
+        item.notes = notes
+        return true
+    }
+
+    fun getNotes(id: Int): String? = items.find { it.id == id }?.notes
 }

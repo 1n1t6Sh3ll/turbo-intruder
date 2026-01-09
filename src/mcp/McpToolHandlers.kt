@@ -27,6 +27,15 @@ class McpToolHandlers(
         )
     }
 
+    fun setOrganizerNotes(id: Int, notes: String): Map<String, String> {
+        val success = organizerProvider.setNotes(id, notes)
+        return if (success) {
+            mapOf("status" to "success")
+        } else {
+            mapOf("error" to "not_found")
+        }
+    }
+
     fun startRun(
         script: String,
         baseRequest: String,

@@ -13,6 +13,7 @@ data class OrganizerItemData(
 interface OrganizerProvider {
     fun getItems(): List<OrganizerItemData>
     fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData>
+    fun setNotes(id: Int, notes: String): Boolean
 }
 
 class BurpOrganizerProvider : OrganizerProvider {
@@ -39,5 +40,13 @@ class BurpOrganizerProvider : OrganizerProvider {
                 notes = item.annotations()?.notes() ?: ""
             )
         }
+    }
+
+    override fun setNotes(id: Int, notes: String): Boolean {
+        val organizer = Utils.montoyaApi?.organizer() ?: return false
+        val filter = OrganizerItemFilter { item -> item.id() == id }
+        val item = organizer.items(filter).firstOrNull() ?: return false
+        item.annotations()?.setNotes(notes)
+        return true
     }
 }

@@ -21,7 +21,10 @@ import org.eclipse.jetty.server.ServerConnector
 import java.util.EnumSet
 import jakarta.servlet.DispatcherType
 
-class TurboMcpServer(private val port: Int = 31338) {
+class TurboMcpServer(
+    private val port: Int = 31338,
+    private val disabledTools: Set<String> = emptySet()
+) {
 
     private val manager = RunManager()
     val toolHandlers = McpToolHandlers(manager)
@@ -93,15 +96,27 @@ class TurboMcpServer(private val port: Int = 31338) {
         jettyServer = null
     }
 
-    private fun buildToolSpecifications(): List<McpServerFeatures.SyncToolSpecification> {
-        return listOf(
+    private val allTools by lazy {
+        listOf(
             buildStartRunTool(),
             buildStartConcurrentRunTool(),
             buildStopRunTool(),
             buildDeleteRunTool(),
             buildDeleteAllRunsTool(),
-            buildGetOrganizerItemsTool()
+            buildGetOrganizerItemsTool(),
+            buildSetOrganizerNotesTool()
         )
+    }
+
+    private fun buildToolSpecifications(): List<McpServerFeatures.SyncToolSpecification> {
+        return allTools.filter { it.tool().name() !in disabledTools }
+    }
+
+    fun getEnabledToolNames(): Set<String> {
+        return allTools
+            .filter { it.tool().name() !in disabledTools }
+            .map { it.tool().name() }
+            .toSet()
     }
 
     private fun buildStartRunTool(): McpServerFeatures.SyncToolSpecification {
@@ -306,6 +321,44 @@ class TurboMcpServer(private val port: Int = 31338) {
                 val args = request.arguments()
                 val result = toolHandlers.getOrganizerItems(
                     ids = args["ids"] as? String ?: ""
+                )
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
+    }
+
+    private fun buildSetOrganizerNotesTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("set_organizer_notes")
+            .description("Update the notes on an Organizer item.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "The Organizer item ID"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "The new notes content"
+                    }
+                },
+                "required": ["id", "notes"]
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                val args = request.arguments()
+                val result = toolHandlers.setOrganizerNotes(
+                    id = (args["id"] as? Number)?.toInt() ?: 0,
+                    notes = args["notes"] as? String ?: ""
                 )
                 McpSchema.CallToolResult.builder()
                     .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
