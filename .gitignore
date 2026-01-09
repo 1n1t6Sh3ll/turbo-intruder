@@ -5,3 +5,5 @@ build
 Icon?
 plan.md
 src/spec-*.md
+mcp-guidance/
+montoya-interface/
