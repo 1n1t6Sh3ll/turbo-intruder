@@ -20,7 +20,8 @@ class McpToolHandlers(
                 mapOf(
                     "id" to item.id,
                     "request" to item.request,
-                    "response" to item.response
+                    "response" to item.response,
+                    "notes" to item.notes
                 )
             }
         )

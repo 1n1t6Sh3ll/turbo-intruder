@@ -18,3 +18,7 @@ java -jar build/libs/turbo-intruder.jar --mcp
 ```
 
 Standalone listens on `localhost:31338`. Burp extension uses `localhost:31337`.
+
+## Development
+
+Always use `superpowers:test-driven-development` when editing code.

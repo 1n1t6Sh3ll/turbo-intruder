@@ -63,6 +63,19 @@ class McpToolHandlersTest {
     }
 
     @Test
+    fun `getOrganizerItems returns notes`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET / HTTP/1.1", "HTTP/1.1 200 OK", "Interesting finding")
+        ))
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItems("1")
+
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals("Interesting finding", items[0]["notes"])
+    }
+
+    @Test
     fun `startRun creates new run and returns status`() {
         val result = handlers.startRun(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
@@ -126,15 +139,16 @@ class McpToolHandlersTest {
 data class FakeOrganizerItem(
     val id: Int,
     val request: String,
-    val response: String
+    val response: String,
+    val notes: String = ""
 )
 
 class FakeOrganizerProvider(private val items: List<FakeOrganizerItem>) : OrganizerProvider {
     override fun getItems(): List<OrganizerItemData> {
-        return items.map { OrganizerItemData(it.id, it.request, it.response) }
+        return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
     }
 
     override fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData> {
-        return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response) }
+        return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
     }
 }

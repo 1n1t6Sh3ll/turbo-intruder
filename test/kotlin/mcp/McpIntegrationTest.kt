@@ -16,6 +16,14 @@ class McpIntegrationTest {
         server = TurboMcpServer(port = 31338)
     }
 
+    // Helper to get the first result's ID (getRequestDetail now looks up by ID, not index)
+    @Suppress("UNCHECKED_CAST")
+    private fun getFirstResultId(): Int {
+        val results = server.resourceHandlers.getResults(null, "id", false, 1, 0)
+        val resultsList = results["results"] as List<Map<String, Any?>>
+        return resultsList.first()["id"] as Int
+    }
+
     @Test
     fun `tool handlers work end to end`() {
         // Test via handlers directly since HTTP client setup is complex
@@ -93,7 +101,8 @@ def handleResponse(req, interesting):
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
-        val detail = server.resourceHandlers.getRequestDetail(null, 0)
+        val requestId = getFirstResultId()
+        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val response = detail["response"] as String
@@ -141,7 +150,8 @@ def handleResponse(req, interesting):
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
-        val detail = server.resourceHandlers.getRequestDetail(null, 0)
+        val requestId = getFirstResultId()
+        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val request = detail["request"] as String
@@ -196,7 +206,8 @@ def handleResponse(req, interesting):
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
-        val detail = server.resourceHandlers.getRequestDetail(null, 0)
+        val requestId = getFirstResultId()
+        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val request = detail["request"] as String
@@ -247,7 +258,8 @@ def handleResponse(req, interesting):
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
-        val detail = server.resourceHandlers.getRequestDetail(null, 0)
+        val requestId = getFirstResultId()
+        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val request = detail["request"] as String

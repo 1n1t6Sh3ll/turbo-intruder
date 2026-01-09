@@ -52,27 +52,35 @@ class ResultStoreTest {
     }
 
     @Test
-    fun `getRequest returns request at valid index`() {
+    fun `getRequest returns request by ID`() {
         val req = Request("GET / HTTP/1.1")
+        req.id = 42
         store.add(req)
 
-        val retrieved = store.getRequest(0)
+        val retrieved = store.getRequest(42)
 
         assertSame(req, retrieved)
     }
 
     @Test
-    fun `getRequest returns null for negative index`() {
-        store.add(Request("GET / HTTP/1.1"))
+    fun `getRequest returns null for non-existent ID`() {
+        val req = Request("GET / HTTP/1.1")
+        req.id = 1
+        store.add(req)
 
-        assertNull(store.getRequest(-1))
+        assertNull(store.getRequest(999))
     }
 
     @Test
-    fun `getRequest returns null for index beyond size`() {
-        store.add(Request("GET / HTTP/1.1"))
+    fun `getRequest finds correct request among multiple`() {
+        val req1 = Request("GET /1 HTTP/1.1").apply { id = 10 }
+        val req2 = Request("GET /2 HTTP/1.1").apply { id = 20 }
+        val req3 = Request("GET /3 HTTP/1.1").apply { id = 30 }
+        store.add(req1)
+        store.add(req2)
+        store.add(req3)
 
-        assertNull(store.getRequest(5))
+        assertSame(req2, store.getRequest(20))
     }
 
     @Test

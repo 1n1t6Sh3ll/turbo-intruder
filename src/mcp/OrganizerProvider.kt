@@ -6,7 +6,8 @@ import burp.api.montoya.organizer.OrganizerItemFilter
 data class OrganizerItemData(
     val id: Int,
     val request: String,
-    val response: String
+    val response: String,
+    val notes: String
 )
 
 interface OrganizerProvider {
@@ -21,7 +22,8 @@ class BurpOrganizerProvider : OrganizerProvider {
             OrganizerItemData(
                 id = item.id(),
                 request = item.request()?.toString() ?: "",
-                response = item.response()?.toString() ?: ""
+                response = item.response()?.toString() ?: "",
+                notes = item.annotations()?.notes() ?: ""
             )
         }
     }
@@ -33,7 +35,8 @@ class BurpOrganizerProvider : OrganizerProvider {
             OrganizerItemData(
                 id = item.id(),
                 request = item.request()?.toString() ?: "",
-                response = item.response()?.toString() ?: ""
+                response = item.response()?.toString() ?: "",
+                notes = item.annotations()?.notes() ?: ""
             )
         }
     }

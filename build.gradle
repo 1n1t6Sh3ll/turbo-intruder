@@ -68,6 +68,10 @@ test {
     useJUnitPlatform()
 }
 
+processResources {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
 jar {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }

@@ -285,7 +285,7 @@ class TurboMcpServer(private val port: Int = 31338) {
     private fun buildGetOrganizerItemsTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("get_organizer_items")
-            .description("Retrieve items from Burp's Organizer by their IDs. Returns the full request and response for each item.")
+            .description("Retrieve items from Burp's Organizer by their IDs. Returns the full request, response, and notes for each item.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
