@@ -99,6 +99,33 @@ class McpToolHandlersTest {
     }
 
     @Test
+    fun `listOrganizerItems returns all item IDs`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK")
+        ))
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems()
+
+        assertEquals(3, result["count"])
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(listOf(1, 2, 3), items.map { it["id"] })
+    }
+
+    @Test
+    fun `listOrganizerItems returns empty list when no items`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems()
+
+        assertEquals(0, result["count"])
+        assertEquals(emptyList<Any>(), result["items"])
+    }
+
+    @Test
     fun `startRun creates new run and returns status`() {
         val result = handlers.startRun(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",

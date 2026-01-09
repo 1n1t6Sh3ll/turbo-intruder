@@ -104,7 +104,8 @@ class TurboMcpServer(
             buildDeleteRunTool(),
             buildDeleteAllRunsTool(),
             buildGetOrganizerItemsTool(),
-            buildSetOrganizerNotesTool()
+            buildSetOrganizerNotesTool(),
+            buildListOrganizerItemsTool()
         )
     }
 
@@ -360,6 +361,30 @@ class TurboMcpServer(
                     id = (args["id"] as? Number)?.toInt() ?: 0,
                     notes = args["notes"] as? String ?: ""
                 )
+                McpSchema.CallToolResult.builder()
+                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                    .isError(false)
+                    .build()
+            }
+            .build()
+    }
+
+    private fun buildListOrganizerItemsTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("list_organizer_items")
+            .description("List all items in Burp's Organizer. Returns item IDs and count.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {}
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, _ ->
+                val result = toolHandlers.listOrganizerItems()
                 McpSchema.CallToolResult.builder()
                     .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
                     .isError(false)

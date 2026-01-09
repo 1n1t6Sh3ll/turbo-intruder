@@ -36,6 +36,14 @@ class McpToolHandlers(
         }
     }
 
+    fun listOrganizerItems(): Map<String, Any> {
+        val items = organizerProvider.getItems()
+        return mapOf(
+            "count" to items.size,
+            "items" to items.map { mapOf("id" to it.id) }
+        )
+    }
+
     fun startRun(
         script: String,
         baseRequest: String,
