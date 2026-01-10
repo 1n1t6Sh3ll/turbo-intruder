@@ -105,10 +105,13 @@ def handleResponse(req, interesting):
         val detail = server.resourceHandlers.getRequestDetail(null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
-        val response = detail["response"] as String
-        assertTrue(response.contains("User-agent: *"), "Response should contain User-agent directive")
-        assertTrue(response.contains("Disallow: /settings"), "Response should contain Disallow /settings")
-        assertTrue(response.contains("Disallow: /pleasebanme"), "Response should contain Disallow /pleasebanme")
+        // Response is now split into headers and body (truncated to body_limit, default 100 chars)
+        // For this test, we need more body, so call with higher limit
+        val detailFull = server.resourceHandlers.getRequestDetail(null, requestId, bodyLimit = 10000)
+        val responseBody = detailFull["response_body"] as String
+        assertTrue(responseBody.contains("User-agent: *"), "Response should contain User-agent directive")
+        assertTrue(responseBody.contains("Disallow: /settings"), "Response should contain Disallow /settings")
+        assertTrue(responseBody.contains("Disallow: /pleasebanme"), "Response should contain Disallow /pleasebanme")
     }
 
     @Test

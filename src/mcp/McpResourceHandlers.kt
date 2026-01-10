@@ -2,6 +2,7 @@ package mcp
 
 import burp.SortField
 import java.io.File
+import kotlin.io.path.createTempDirectory
 
 class McpResourceHandlers(private val manager: RunManager) {
 
@@ -76,21 +77,67 @@ class McpResourceHandlers(private val manager: RunManager) {
         )
     }
 
-    fun getRequestDetail(runId: String?, requestId: Int): Map<String, Any?> {
+    fun getRequestDetail(
+        runId: String?,
+        requestId: Int,
+        bodyLimit: Int = 100,
+        exportFile: Boolean = false
+    ): Map<String, Any?> {
         val run = manager.getRun(runId)
             ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
 
         val request = run.store.getRequest(requestId)
             ?: return mapOf("error" to "request_not_found")
 
+        if (exportFile) {
+            val tempDir = createTempDirectory("turbo-${run.id}-").toFile()
+            val requestFile = File(tempDir, "request-$requestId.txt")
+            val responseFile = File(tempDir, "response-$requestId.txt")
+
+            requestFile.writeText(request.getRequest())
+            request.response?.let { responseFile.writeText(it) }
+
+            return mapOf(
+                "request_file" to requestFile.absolutePath,
+                "response_file" to responseFile.absolutePath,
+                "status" to request.code,
+                "length" to request.length,
+                "time" to request.time,
+                "words" to request.words
+            )
+        }
+
+        val response = request.response
+        val (headers, body) = splitResponse(response)
+        val truncatedBody = if (bodyLimit > 0 && body.length > bodyLimit) {
+            body.take(bodyLimit)
+        } else {
+            body
+        }
+
         return mapOf(
             "request" to request.getRequest(),
-            "response" to request.response,
+            "response_headers" to headers,
+            "response_body" to truncatedBody,
             "status" to request.code,
             "length" to request.length,
             "time" to request.time,
             "words" to request.words
         )
+    }
+
+    private fun splitResponse(response: String?): Pair<String, String> {
+        if (response == null) return Pair("", "")
+
+        val separatorIndex = response.indexOf("\r\n\r\n")
+        return if (separatorIndex != -1) {
+            Pair(
+                response.substring(0, separatorIndex),
+                response.substring(separatorIndex + 4)
+            )
+        } else {
+            Pair(response, "")
+        }
     }
 
     // Documentation resources
@@ -187,7 +234,13 @@ class McpResourceHandlers(private val manager: RunManager) {
             uri.matches(Regex("turbo://runs/[^/]+/requests/\\d+.*")) -> {
                 val runId = parseRunId(uri)
                 val requestId = parseRequestId(uri) ?: return mapOf("error" to "invalid_request_id")
-                getRequestDetail(runId, requestId)
+                val params = parseQueryParams(uri)
+                getRequestDetail(
+                    runId = runId,
+                    requestId = requestId,
+                    bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
+                    exportFile = params["export"] == "file"
+                )
             }
             uri.matches(Regex("turbo://runs/[^/]+/results.*")) -> {
                 val runId = parseRunId(uri)

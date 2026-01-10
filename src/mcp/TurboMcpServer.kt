@@ -7,6 +7,7 @@ import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpSyncServer
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider
 import io.modelcontextprotocol.spec.McpSchema
+import jakarta.servlet.DispatcherType
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest
@@ -18,8 +19,23 @@ import org.eclipse.jetty.ee10.servlet.ServletContextHandler
 import org.eclipse.jetty.ee10.servlet.ServletHolder
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.util.EnumSet
-import jakarta.servlet.DispatcherType
+
+/**
+ * Formats an exception into a map containing the error message and full stack trace.
+ * This is used to provide debugging information in MCP error responses.
+ */
+fun formatErrorWithStackTrace(e: Exception): Map<String, Any?> {
+    val stackTrace = StringWriter().also { sw ->
+        e.printStackTrace(PrintWriter(sw))
+    }.toString()
+    return mapOf(
+        "error" to (e.message ?: "Unknown error"),
+        "stack_trace" to stackTrace
+    )
+}
 
 class TurboMcpServer(
     private val port: Int = 31338,
@@ -33,6 +49,25 @@ class TurboMcpServer(
     private var server: McpSyncServer? = null
     private var jettyServer: Server? = null
     private val jsonMapper = JacksonMcpJsonMapper(ObjectMapper())
+
+    /**
+     * Wraps a tool handler action with error handling that includes stack traces.
+     */
+    private fun <T> executeToolWithErrorHandling(action: () -> T): McpSchema.CallToolResult {
+        return try {
+            val result = action()
+            McpSchema.CallToolResult.builder()
+                .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
+                .isError(false)
+                .build()
+        } catch (e: Exception) {
+            val errorResult = formatErrorWithStackTrace(e)
+            McpSchema.CallToolResult.builder()
+                .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(errorResult))))
+                .isError(true)
+                .build()
+        }
+    }
 
     fun start() {
         // Fix classloader for ServiceLoader in Burp's environment
@@ -105,7 +140,8 @@ class TurboMcpServer(
             buildDeleteAllRunsTool(),
             buildGetOrganizerItemsTool(),
             buildSetOrganizerNotesTool(),
-            buildListOrganizerItemsTool()
+            buildListOrganizerItemsTool(),
+            buildSaveToOrganizerTool()
         )
     }
 
@@ -153,17 +189,15 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, request ->
-                val args = request.arguments()
-                val result = toolHandlers.startRun(
-                    script = args["script"] as? String ?: "",
-                    baseRequest = args["base_request"] as? String ?: "",
-                    endpoint = args["endpoint"] as? String ?: "",
-                    baseInput = args["base_input"] as? String ?: ""
-                )
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.startRun(
+                        script = args["script"] as? String ?: "",
+                        baseRequest = args["base_request"] as? String ?: "",
+                        endpoint = args["endpoint"] as? String ?: "",
+                        baseInput = args["base_input"] as? String ?: ""
+                    )
+                }
             }
             .build()
     }
@@ -201,17 +235,15 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, request ->
-                val args = request.arguments()
-                val result = toolHandlers.startConcurrentRun(
-                    script = args["script"] as? String ?: "",
-                    baseRequest = args["base_request"] as? String ?: "",
-                    endpoint = args["endpoint"] as? String ?: "",
-                    baseInput = args["base_input"] as? String ?: ""
-                )
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.startConcurrentRun(
+                        script = args["script"] as? String ?: "",
+                        baseRequest = args["base_request"] as? String ?: "",
+                        endpoint = args["endpoint"] as? String ?: "",
+                        baseInput = args["base_input"] as? String ?: ""
+                    )
+                }
             }
             .build()
     }
@@ -236,11 +268,9 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, request ->
-                val result = toolHandlers.stopRun(request.arguments()["run_id"] as? String)
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    toolHandlers.stopRun(request.arguments()["run_id"] as? String)
+                }
             }
             .build()
     }
@@ -265,11 +295,9 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, request ->
-                val result = toolHandlers.deleteRun(request.arguments()["run_id"] as? String)
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    toolHandlers.deleteRun(request.arguments()["run_id"] as? String)
+                }
             }
             .build()
     }
@@ -289,11 +317,9 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, _ ->
-                val result = toolHandlers.deleteAllRuns()
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    toolHandlers.deleteAllRuns()
+                }
             }
             .build()
     }
@@ -319,14 +345,12 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, request ->
-                val args = request.arguments()
-                val result = toolHandlers.getOrganizerItems(
-                    ids = args["ids"] as? String ?: ""
-                )
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.getOrganizerItems(
+                        ids = args["ids"] as? String ?: ""
+                    )
+                }
             }
             .build()
     }
@@ -356,15 +380,13 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, request ->
-                val args = request.arguments()
-                val result = toolHandlers.setOrganizerNotes(
-                    id = (args["id"] as? Number)?.toInt() ?: 0,
-                    notes = args["notes"] as? String ?: ""
-                )
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.setOrganizerNotes(
+                        id = (args["id"] as? Number)?.toInt() ?: 0,
+                        notes = args["notes"] as? String ?: ""
+                    )
+                }
             }
             .build()
     }
@@ -384,11 +406,45 @@ class TurboMcpServer(
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
             .callHandler { _, _ ->
-                val result = toolHandlers.listOrganizerItems()
-                McpSchema.CallToolResult.builder()
-                    .content(listOf(McpSchema.TextContent(jsonMapper.writeValueAsString(result))))
-                    .isError(false)
-                    .build()
+                executeToolWithErrorHandling {
+                    toolHandlers.listOrganizerItems()
+                }
+            }
+            .build()
+    }
+
+    private fun buildSaveToOrganizerTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("save_to_organizer")
+            .description("Save requests from a run to Burp's Organizer with custom notes.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "run_id": {
+                        "type": "string",
+                        "description": "ID of the run to save requests from. Omit for current run."
+                    },
+                    "items": {
+                        "type": "string",
+                        "description": "JSON array of objects with request_id (int) and notes (string)"
+                    }
+                },
+                "required": ["items"]
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.saveToOrganizer(
+                        runId = args["run_id"] as? String,
+                        items = args["items"] as? String ?: "[]"
+                    )
+                }
             }
             .build()
     }
@@ -478,7 +534,7 @@ class TurboMcpServer(
         val resource = McpSchema.Resource.builder()
             .uri("turbo://runs/{run_id}/requests/{id}")
             .name("Details of a specific request")
-            .description("Get full request and response details for a specific result item")
+            .description("Get request and response details. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
             .mimeType("application/json")
             .build()
 
@@ -486,7 +542,13 @@ class TurboMcpServer(
             val uri = request.uri()
             val runId = resourceHandlers.parseRunId(uri)
             val requestId = resourceHandlers.parseRequestId(uri) ?: -1
-            val result = resourceHandlers.getRequestDetail(runId, requestId)
+            val params = resourceHandlers.parseQueryParams(uri)
+            val result = resourceHandlers.getRequestDetail(
+                runId = runId,
+                requestId = requestId,
+                bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
+                exportFile = params["export"] == "file"
+            )
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     uri,
