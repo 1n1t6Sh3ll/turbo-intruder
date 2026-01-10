@@ -14,6 +14,7 @@ interface OrganizerProvider {
     fun getItems(): List<OrganizerItemData>
     fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData>
     fun setNotes(id: Int, notes: String): Boolean
+    fun sendToOrganizer(request: burp.Request, notes: String)
 }
 
 class BurpOrganizerProvider : OrganizerProvider {
@@ -48,5 +49,11 @@ class BurpOrganizerProvider : OrganizerProvider {
         val item = organizer.items(filter).firstOrNull() ?: return false
         item.annotations()?.setNotes(notes)
         return true
+    }
+
+    override fun sendToOrganizer(request: burp.Request, notes: String) {
+        val montoyaReq = request.getMontoyaRequest() ?: return
+        montoyaReq.annotations().setNotes(notes)
+        Utils.montoyaApi?.organizer()?.sendToOrganizer(montoyaReq)
     }
 }

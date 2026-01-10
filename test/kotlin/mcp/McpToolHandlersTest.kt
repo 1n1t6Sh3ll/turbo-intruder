@@ -183,6 +183,86 @@ class McpToolHandlersTest {
 
         assertEquals(2, result["deleted_count"])
     }
+
+    @Test
+    fun `saveToOrganizer saves requests with notes`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        // Create a run with some requests
+        val run = manager.startRun()
+        val req1 = burp.Request("GET /page1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nOK"
+        val req2 = burp.Request("GET /page2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 2
+        req2.response = "HTTP/1.1 404 Not Found\r\n\r\nNot Found"
+        run.store.add(req1)
+        run.store.add(req2)
+
+        val result = handlersWithOrganizer.saveToOrganizer(
+            runId = null,
+            items = """[{"request_id": 1, "notes": "Interesting finding"}, {"request_id": 2, "notes": "Check this"}]"""
+        )
+
+        val saved = result["saved"] as List<*>
+        assertEquals(listOf(1, 2), saved)
+        assertEquals(2, fakeOrganizer.sentItems.size)
+        assertEquals("Interesting finding", fakeOrganizer.sentItems[0].second)
+        assertEquals("Check this", fakeOrganizer.sentItems[1].second)
+    }
+
+    @Test
+    fun `saveToOrganizer returns error for non-existent request`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        val run = manager.startRun()
+        val req1 = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\n"
+        run.store.add(req1)
+
+        val result = handlersWithOrganizer.saveToOrganizer(
+            runId = null,
+            items = """[{"request_id": 1, "notes": "Good"}, {"request_id": 999, "notes": "Missing"}]"""
+        )
+
+        val saved = result["saved"] as List<*>
+        val errors = result["errors"] as List<Map<String, Any>>
+        assertEquals(listOf(1), saved)
+        assertEquals(1, errors.size)
+        assertEquals(999, errors[0]["request_id"])
+    }
+
+    @Test
+    fun `saveToOrganizer uses specified run`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
+
+        // Create two runs
+        val run1 = manager.startConcurrentRun()
+        val req1 = burp.Request("GET /run1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\n"
+        run1.store.add(req1)
+
+        val run2 = manager.startConcurrentRun()
+        val req2 = burp.Request("GET /run2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 1  // Same ID but different run
+        req2.response = "HTTP/1.1 404 Not Found\r\n\r\n"
+        run2.store.add(req2)
+
+        val result = handlersWithOrganizer.saveToOrganizer(
+            runId = run1.id,
+            items = """[{"request_id": 1, "notes": "From run1"}]"""
+        )
+
+        val saved = result["saved"] as List<*>
+        assertEquals(listOf(1), saved)
+        assertEquals(1, fakeOrganizer.sentItems.size)
+        assertTrue(fakeOrganizer.sentItems[0].first.template.contains("/run1"))
+    }
 }
 
 // Test helpers
@@ -195,6 +275,7 @@ data class FakeOrganizerItem(
 
 class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider {
     private val items = items.toMutableList()
+    val sentItems = mutableListOf<Pair<burp.Request, String>>()
 
     override fun getItems(): List<OrganizerItemData> {
         return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
@@ -210,5 +291,16 @@ class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider 
         return true
     }
 
+    override fun sendToOrganizer(request: burp.Request, notes: String) {
+        sentItems.add(Pair(request, notes))
+    }
+
     fun getNotes(id: Int): String? = items.find { it.id == id }?.notes
+}
+
+class ThrowingOrganizerProvider : OrganizerProvider {
+    override fun getItems(): List<OrganizerItemData> = throw RuntimeException("Test exception from getItems")
+    override fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData> = throw RuntimeException("Test exception from getItemsByIds")
+    override fun setNotes(id: Int, notes: String): Boolean = throw RuntimeException("Test exception from setNotes")
+    override fun sendToOrganizer(request: burp.Request, notes: String) = throw RuntimeException("Test exception from sendToOrganizer")
 }

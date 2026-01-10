@@ -3,8 +3,18 @@ import burp.api.montoya.http.message.HttpRequestResponse
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.lang.Exception
+import java.net.URL
 import java.util.*
 import kotlin.collections.HashMap
+
+/**
+ * Returns the effective port for a URL, using the default port for the protocol
+ * if no explicit port is specified. This handles the case where URL.getPort()
+ * returns -1 for URLs like "https://example.com" without explicit port.
+ */
+fun getEffectivePort(url: URL): Int {
+    return if (url.port == -1) url.defaultPort else url.port
+}
 
 open class Request(val template: String, val words: List<String?>, val learnBoring: Int, var label: String = "") {
 
@@ -210,7 +220,7 @@ class BurpRequest(val req: Request): IHttpRequestResponse {
 
     override fun getHttpService(): IHttpService {
         val url = req._engine!!.target
-        return Utils.callbacks.helpers.buildHttpService(url.host, url.port, url.protocol)
+        return Utils.callbacks.helpers.buildHttpService(url.host, getEffectivePort(url), url.protocol)
     }
 
     override fun getComment(): String? {

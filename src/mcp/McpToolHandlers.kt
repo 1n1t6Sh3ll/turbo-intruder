@@ -2,6 +2,7 @@ package mcp
 
 import burp.Utils
 import burp.evalJython
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlin.concurrent.thread
 
 class McpToolHandlers(
@@ -42,6 +43,34 @@ class McpToolHandlers(
             "count" to items.size,
             "items" to items.map { mapOf("id" to it.id) }
         )
+    }
+
+    fun saveToOrganizer(runId: String?, items: String): Map<String, Any> {
+        val run = if (runId != null) {
+            manager.getRun(runId)
+        } else {
+            manager.currentRun
+        } ?: return mapOf("saved" to emptyList<Int>(), "errors" to listOf(mapOf("error" to "No run found")))
+
+        val mapper = ObjectMapper()
+        val itemList = mapper.readTree(items)
+
+        val saved = mutableListOf<Int>()
+        val errors = mutableListOf<Map<String, Any>>()
+
+        for (item in itemList) {
+            val requestId = item.get("request_id").asInt()
+            val notes = item.get("notes").asText()
+            val request = run.store.getRequest(requestId)
+            if (request == null) {
+                errors.add(mapOf("request_id" to requestId, "error" to "Request not found"))
+                continue
+            }
+            organizerProvider.sendToOrganizer(request, notes)
+            saved.add(requestId)
+        }
+
+        return mapOf("saved" to saved, "errors" to errors)
     }
 
     fun startRun(
