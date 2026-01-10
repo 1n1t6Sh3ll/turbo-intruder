@@ -39,11 +39,12 @@ fun formatErrorWithStackTrace(e: Exception): Map<String, Any?> {
 
 class TurboMcpServer(
     private val port: Int = 31338,
-    private val disabledTools: Set<String> = emptySet()
+    private val disabledTools: Set<String> = emptySet(),
+    private val collaboratorProvider: CollaboratorProvider? = null
 ) {
 
     private val manager = RunManager()
-    val toolHandlers = McpToolHandlers(manager)
+    val toolHandlers = McpToolHandlers(manager, collaboratorProvider = collaboratorProvider)
     val resourceHandlers = McpResourceHandlers(manager)
 
     private var server: McpSyncServer? = null
@@ -141,7 +142,9 @@ class TurboMcpServer(
             buildGetOrganizerItemsTool(),
             buildSetOrganizerNotesTool(),
             buildListOrganizerItemsTool(),
-            buildSaveToOrganizerTool()
+            buildSaveToOrganizerTool(),
+            buildGenerateCollaboratorPayloadTool(),
+            buildGetCollaboratorInteractionsTool()
         )
     }
 
@@ -444,6 +447,68 @@ class TurboMcpServer(
                         runId = args["run_id"] as? String,
                         items = args["items"] as? String ?: "[]"
                     )
+                }
+            }
+            .build()
+    }
+
+    private fun buildGenerateCollaboratorPayloadTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("generate_collaborator_payload")
+            .description("Generate a Burp Collaborator payload for out-of-band testing. Returns a unique domain that will capture DNS/HTTP/SMTP interactions.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "metadata": {
+                        "type": "string",
+                        "description": "Description of what this payload tests for (e.g., 'SSRF in webhook URL parameter')"
+                    }
+                },
+                "required": ["metadata"]
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.generateCollaboratorPayload(
+                        metadata = args["metadata"] as? String ?: ""
+                    )
+                }
+            }
+            .build()
+    }
+
+    private fun buildGetCollaboratorInteractionsTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("get_collaborator_interactions")
+            .description("Retrieve Collaborator interactions (DNS lookups, HTTP requests, etc.) for generated payloads. Returns interaction details including type, timestamp, client IP, and protocol-specific data.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "payloads": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Filter to specific payload domains. Omit to get all interactions from this session."
+                    }
+                }
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    @Suppress("UNCHECKED_CAST")
+                    val payloads = args["payloads"] as? List<String>
+                    toolHandlers.getCollaboratorInteractions(payloads)
                 }
             }
             .build()

@@ -7,7 +7,8 @@ import kotlin.concurrent.thread
 
 class McpToolHandlers(
     private val manager: RunManager,
-    private val organizerProvider: OrganizerProvider = BurpOrganizerProvider()
+    private val organizerProvider: OrganizerProvider = BurpOrganizerProvider(),
+    private val collaboratorProvider: CollaboratorProvider? = null
 ) {
 
     fun getOrganizerItems(ids: String): Map<String, Any?> {
@@ -42,6 +43,31 @@ class McpToolHandlers(
         return mapOf(
             "count" to items.size,
             "items" to items.map { mapOf("id" to it.id) }
+        )
+    }
+
+    fun generateCollaboratorPayload(metadata: String): Map<String, Any?> {
+        val provider = collaboratorProvider
+            ?: return mapOf("error" to "Collaborator requires Burp Suite connection")
+        val payload = provider.generatePayload(metadata)
+        return mapOf("payload" to payload)
+    }
+
+    fun getCollaboratorInteractions(payloads: List<String>?): Map<String, Any> {
+        val provider = collaboratorProvider
+            ?: return mapOf("error" to "Collaborator requires Burp Suite connection", "interactions" to emptyList<Any>())
+        val interactions = provider.getInteractions(payloads)
+        return mapOf(
+            "interactions" to interactions.map { interaction ->
+                mapOf(
+                    "payload" to interaction.payload,
+                    "metadata" to interaction.metadata,
+                    "type" to interaction.type,
+                    "timestamp" to interaction.timestamp,
+                    "client_ip" to interaction.clientIp,
+                    "details" to interaction.details
+                )
+            }
         )
     }
 

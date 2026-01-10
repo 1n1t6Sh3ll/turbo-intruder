@@ -47,7 +47,10 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
         SwingUtilities.invokeLater(ConfigMenu())
         SwingUtilities.invokeLater { addRunScriptToExistingMenu() }
 
-        mcpServer = mcp.TurboMcpServer(port = 31337)
+        mcpServer = mcp.TurboMcpServer(
+            port = 31337,
+            collaboratorProvider = mcp.BurpCollaboratorProvider()
+        )
         mcpServer?.start()
     }
 

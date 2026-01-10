@@ -304,3 +304,207 @@ class ThrowingOrganizerProvider : OrganizerProvider {
     override fun setNotes(id: Int, notes: String): Boolean = throw RuntimeException("Test exception from setNotes")
     override fun sendToOrganizer(request: burp.Request, notes: String) = throw RuntimeException("Test exception from sendToOrganizer")
 }
+
+// Collaborator test helpers
+class FakeCollaboratorProvider(
+    private val organizerProvider: OrganizerProvider? = null
+) : CollaboratorProvider {
+    private var payloadCounter = 0
+    private val interactions = mutableListOf<CollaboratorInteractionData>()
+    var organizerSentCount = 0
+
+    override fun generatePayload(metadata: String): String {
+        val payload = "test${++payloadCounter}.oastify.com"
+        return payload
+    }
+
+    override fun getInteractions(payloads: List<String>?): List<CollaboratorInteractionData> {
+        val result = if (payloads == null) {
+            interactions.toList()
+        } else {
+            interactions.filter { it.payload in payloads }
+        }
+
+        // Simulate sending HTTP interactions to Organizer
+        for (interaction in result) {
+            if (interaction.type == "HTTP" && organizerProvider != null) {
+                organizerSentCount++
+            }
+        }
+
+        return result
+    }
+
+    // Test helper to simulate interactions
+    fun addInteraction(interaction: CollaboratorInteractionData) {
+        interactions.add(interaction)
+    }
+}
+
+class CollaboratorToolHandlersTest {
+
+    private lateinit var manager: RunManager
+    private lateinit var handlers: McpToolHandlers
+
+    @BeforeEach
+    fun setup() {
+        manager = RunManager()
+    }
+
+    @Test
+    fun `generateCollaboratorPayload returns payload domain`() {
+        val fakeCollaborator = FakeCollaboratorProvider()
+        handlers = McpToolHandlers(manager, collaboratorProvider = fakeCollaborator)
+
+        val result = handlers.generateCollaboratorPayload("SSRF test in webhook param")
+
+        assertEquals("test1.oastify.com", result["payload"])
+    }
+
+    @Test
+    fun `generateCollaboratorPayload stores metadata for later retrieval`() {
+        val fakeCollaborator = FakeCollaboratorProvider()
+        handlers = McpToolHandlers(manager, collaboratorProvider = fakeCollaborator)
+
+        handlers.generateCollaboratorPayload("SSRF test")
+
+        // Add an interaction for the generated payload
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "test1.oastify.com",
+            metadata = "SSRF test",
+            type = "DNS",
+            timestamp = "2024-01-01T12:00:00Z",
+            clientIp = "1.2.3.4",
+            details = mapOf("query_type" to "A")
+        ))
+
+        val interactions = handlers.getCollaboratorInteractions(null)
+        val items = interactions["interactions"] as List<Map<String, Any?>>
+
+        assertEquals(1, items.size)
+        assertEquals("SSRF test", items[0]["metadata"])
+    }
+
+    @Test
+    fun `getCollaboratorInteractions filters by payload`() {
+        val fakeCollaborator = FakeCollaboratorProvider()
+        handlers = McpToolHandlers(manager, collaboratorProvider = fakeCollaborator)
+
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "abc.oastify.com",
+            metadata = "Test A",
+            type = "DNS",
+            timestamp = "2024-01-01T12:00:00Z",
+            clientIp = "1.2.3.4",
+            details = emptyMap()
+        ))
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "xyz.oastify.com",
+            metadata = "Test B",
+            type = "HTTP",
+            timestamp = "2024-01-01T12:01:00Z",
+            clientIp = "5.6.7.8",
+            details = emptyMap()
+        ))
+
+        val result = handlers.getCollaboratorInteractions(listOf("abc.oastify.com"))
+        val items = result["interactions"] as List<Map<String, Any?>>
+
+        assertEquals(1, items.size)
+        assertEquals("abc.oastify.com", items[0]["payload"])
+    }
+
+    @Test
+    fun `getCollaboratorInteractions returns all interactions when no filter`() {
+        val fakeCollaborator = FakeCollaboratorProvider()
+        handlers = McpToolHandlers(manager, collaboratorProvider = fakeCollaborator)
+
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "abc.oastify.com",
+            metadata = "Test A",
+            type = "DNS",
+            timestamp = "2024-01-01T12:00:00Z",
+            clientIp = "1.2.3.4",
+            details = emptyMap()
+        ))
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "xyz.oastify.com",
+            metadata = "Test B",
+            type = "HTTP",
+            timestamp = "2024-01-01T12:01:00Z",
+            clientIp = "5.6.7.8",
+            details = emptyMap()
+        ))
+
+        val result = handlers.getCollaboratorInteractions(null)
+        val items = result["interactions"] as List<Map<String, Any?>>
+
+        assertEquals(2, items.size)
+    }
+
+    @Test
+    fun `getCollaboratorInteractions returns interaction details`() {
+        val fakeCollaborator = FakeCollaboratorProvider()
+        handlers = McpToolHandlers(manager, collaboratorProvider = fakeCollaborator)
+
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "test.oastify.com",
+            metadata = "SSRF test",
+            type = "HTTP",
+            timestamp = "2024-01-01T12:00:00Z",
+            clientIp = "10.0.0.1",
+            details = mapOf("method" to "GET", "path" to "/")
+        ))
+
+        val result = handlers.getCollaboratorInteractions(null)
+        val items = result["interactions"] as List<Map<String, Any?>>
+
+        assertEquals("test.oastify.com", items[0]["payload"])
+        assertEquals("SSRF test", items[0]["metadata"])
+        assertEquals("HTTP", items[0]["type"])
+        assertEquals("2024-01-01T12:00:00Z", items[0]["timestamp"])
+        assertEquals("10.0.0.1", items[0]["client_ip"])
+        val details = items[0]["details"] as Map<*, *>
+        assertEquals("GET", details["method"])
+    }
+
+    @Test
+    fun `getCollaboratorInteractions sends HTTP interactions to Organizer`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val fakeCollaborator = FakeCollaboratorProvider(organizerProvider = fakeOrganizer)
+        handlers = McpToolHandlers(manager, organizerProvider = fakeOrganizer, collaboratorProvider = fakeCollaborator)
+
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "test.oastify.com",
+            metadata = "SSRF in webhook",
+            type = "HTTP",
+            timestamp = "2024-01-01T12:00:00Z",
+            clientIp = "10.0.0.1",
+            details = mapOf("request" to "GET / HTTP/1.1\r\nHost: test.oastify.com\r\n\r\n")
+        ))
+
+        handlers.getCollaboratorInteractions(null)
+
+        assertEquals(1, fakeCollaborator.organizerSentCount)
+    }
+
+    @Test
+    fun `getCollaboratorInteractions does not send DNS interactions to Organizer`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val fakeCollaborator = FakeCollaboratorProvider(organizerProvider = fakeOrganizer)
+        handlers = McpToolHandlers(manager, organizerProvider = fakeOrganizer, collaboratorProvider = fakeCollaborator)
+
+        fakeCollaborator.addInteraction(CollaboratorInteractionData(
+            payload = "test.oastify.com",
+            metadata = "DNS test",
+            type = "DNS",
+            timestamp = "2024-01-01T12:00:00Z",
+            clientIp = "10.0.0.1",
+            details = mapOf("query_type" to "A")
+        ))
+
+        handlers.getCollaboratorInteractions(null)
+
+        assertEquals(0, fakeCollaborator.organizerSentCount)
+    }
+}
