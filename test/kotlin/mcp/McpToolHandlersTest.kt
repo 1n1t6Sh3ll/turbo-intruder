@@ -126,7 +126,8 @@ class McpToolHandlersTest {
     }
 
     @Test
-    fun `startRun creates new run and returns status`() {
+    fun `startRun blocks until completion and returns results`() {
+        // Use a script that completes immediately
         val result = handlers.startRun(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
@@ -134,13 +135,66 @@ class McpToolHandlersTest {
             baseInput = ""
         )
 
+        assertEquals("completed", result["status"])
+        assertNotNull(result["run_id"])
+        assertNotNull(result["results"])
+        assertNotNull(result["result_count"])
+    }
+
+    @Test
+    fun `startRun returns timeout status when timeout exceeded`() {
+        // Use a script that would run forever (but we timeout quickly)
+        val result = handlers.startRun(
+            script = """
+def queueRequests(target, wordlists):
+    import time
+    time.sleep(10)  # Longer than timeout
+
+def completed(results):
+    pass
+            """.trimIndent(),
+            baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+            endpoint = "https://example.com:443",
+            baseInput = "",
+            timeoutMs = 100  // Very short timeout
+        )
+
+        assertEquals("timeout", result["status"])
+        assertNotNull(result["run_id"])  // Run should still be available
+    }
+
+    @Test
+    fun `startRun uses default 60 second timeout`() {
+        // This test verifies the default parameter exists
+        // We don't actually wait 60 seconds - just verify the function accepts no timeout param
+        val result = handlers.startRun(
+            script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+            endpoint = "https://example.com:443",
+            baseInput = ""
+        )
+
+        // Should complete (not timeout) since script finishes immediately
+        assertEquals("completed", result["status"])
+    }
+
+    @Test
+    fun `startRunAsync returns immediately with started status`() {
+        val result = handlers.startRunAsync(
+            script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+            endpoint = "https://example.com:443",
+            baseInput = ""
+        )
+
         assertEquals("started", result["status"])
+        assertNotNull(result["run_id"])
         assertNotNull(manager.currentRun)
     }
 
     @Test
-    fun `startConcurrentRun preserves existing runs`() {
-        handlers.startRun(
+    fun `startConcurrentRunAsync preserves existing runs`() {
+        handlers.startRunAsync(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -148,7 +202,7 @@ class McpToolHandlersTest {
         )
         val firstRunId = manager.currentRun?.id
 
-        val result = handlers.startConcurrentRun(
+        val result = handlers.startConcurrentRunAsync(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -162,7 +216,7 @@ class McpToolHandlersTest {
 
     @Test
     fun `stopRun stops current run`() {
-        handlers.startRun(
+        handlers.startRunAsync(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",

@@ -103,6 +103,49 @@ class McpToolHandlers(
         script: String,
         baseRequest: String,
         endpoint: String,
+        baseInput: String,
+        timeoutMs: Long = 60000
+    ): Map<String, Any?> {
+        val run = manager.startRun()
+        launchRun(run, script, baseRequest, endpoint, baseInput)
+
+        // Wait for completion or timeout
+        val startTime = System.currentTimeMillis()
+        while (!run.handler.hasFinished()) {
+            if (System.currentTimeMillis() - startTime > timeoutMs) {
+                return mapOf(
+                    "status" to "timeout",
+                    "run_id" to run.id,
+                    "result_count" to run.store.count()
+                )
+            }
+            Thread.sleep(50)
+        }
+
+        // Get results
+        val results = run.store.getResults(burp.SortField.ID, false, 100, 0)
+        return mapOf(
+            "status" to "completed",
+            "run_id" to run.id,
+            "result_count" to run.store.count(),
+            "results" to results.map { req ->
+                mapOf(
+                    "id" to req.id,
+                    "status" to req.code,
+                    "length" to req.length,
+                    "time" to req.time,
+                    "wordcount" to req.wordcount,
+                    "words" to req.words,
+                    "label" to req.label
+                )
+            }
+        )
+    }
+
+    fun startRunAsync(
+        script: String,
+        baseRequest: String,
+        endpoint: String,
         baseInput: String
     ): Map<String, Any?> {
         val run = manager.startRun()
@@ -110,7 +153,7 @@ class McpToolHandlers(
         return mapOf("status" to "started", "run_id" to run.id)
     }
 
-    fun startConcurrentRun(
+    fun startConcurrentRunAsync(
         script: String,
         baseRequest: String,
         endpoint: String,
@@ -167,6 +210,8 @@ class McpToolHandlers(
                 )
             } catch (e: Exception) {
                 System.err.println("Run ${run.id} failed: ${e.message}")
+            } finally {
+                run.handler.markScriptCompleted()
             }
         }
     }

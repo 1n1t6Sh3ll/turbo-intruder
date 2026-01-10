@@ -5,6 +5,7 @@ class RunHandler (){
     private var running = false
     private var engine: RequestEngine? = null
     private var statusOverride: String? = null
+    @Volatile private var scriptCompleted = false
     var msg: String = ""
     var code: String = ""
     var baseRequest: String = ""
@@ -18,11 +19,17 @@ class RunHandler (){
         engine?.showStats(-1)
     }
 
+    fun markScriptCompleted() {
+        scriptCompleted = true
+    }
+
     fun hasFinished(): Boolean {
-        if (engine == null) {
-            return false
+        // If engine exists, check its state
+        if (engine != null) {
+            return engine!!.runState.get() >= 3
         }
-        return engine!!.runState.get() >= 3
+        // If no engine was created, check if script has completed
+        return scriptCompleted
     }
 
     fun setRequestEngine(engine: RequestEngine) {

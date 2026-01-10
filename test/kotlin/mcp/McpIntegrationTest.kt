@@ -27,7 +27,7 @@ class McpIntegrationTest {
     @Test
     fun `tool handlers work end to end`() {
         // Test via handlers directly since HTTP client setup is complex
-        val result = server.toolHandlers.startRun(
+        val result = server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
@@ -38,7 +38,7 @@ class McpIntegrationTest {
 
     @Test
     fun `resource handlers work end to end`() {
-        server.toolHandlers.startRun(
+        server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
@@ -51,7 +51,7 @@ class McpIntegrationTest {
 
     @Test
     fun `resource URI routing works`() {
-        server.toolHandlers.startRun(
+        server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
@@ -80,7 +80,7 @@ def handleResponse(req, interesting):
 
         val baseRequest = "GET /static/robots.txt HTTP/1.1\r\nHost: hackxor.net\r\nConnection: close\r\n\r\n"
 
-        val result = server.toolHandlers.startRun(
+        val result = server.toolHandlers.startRunAsync(
             script = script,
             baseRequest = baseRequest,
             endpoint = "https://hackxor.net:443",
@@ -132,7 +132,7 @@ def handleResponse(req, interesting):
         // Body is exactly 20 bytes: "XXXXXXXXXXXXXXXXXXXX"
         val baseRequest = "POST /static/test HTTP/1.1\r\nHost: hackxor.net\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 20\r\nConnection: close\r\n\r\nXXXXXXXXXXXXXXXXXXXX"
 
-        val result = server.toolHandlers.startRun(
+        val result = server.toolHandlers.startRunAsync(
             script = script,
             baseRequest = baseRequest,
             endpoint = "https://hackxor.net:443",
@@ -188,7 +188,7 @@ def handleResponse(req, interesting):
         // baseRequest uses LF only - should be normalized to CRLF
         val baseRequest = "POST /static/test HTTP/1.1\nHost: hackxor.net\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 20\nConnection: close\n\nXXXXXXXXXXXXXXXXXXXX"
 
-        val result = server.toolHandlers.startRun(
+        val result = server.toolHandlers.startRunAsync(
             script = script,
             baseRequest = baseRequest,
             endpoint = "https://hackxor.net:443",
@@ -240,7 +240,7 @@ def handleResponse(req, interesting):
             "def handleResponse(req, interesting):\r\n" +
             "    table.add(req)\r\n"
 
-        val result = server.toolHandlers.startRun(
+        val result = server.toolHandlers.startRunAsync(
             script = script,
             baseRequest = "GET / HTTP/1.1\r\nHost: hackxor.net\r\n\r\n",
             endpoint = "https://hackxor.net:443",

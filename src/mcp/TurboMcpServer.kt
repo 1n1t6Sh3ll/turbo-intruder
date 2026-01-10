@@ -135,7 +135,8 @@ class TurboMcpServer(
     private val allTools by lazy {
         listOf(
             buildStartRunTool(),
-            buildStartConcurrentRunTool(),
+            buildStartRunAsyncTool(),
+            buildStartConcurrentRunAsyncTool(),
             buildStopRunTool(),
             buildDeleteRunTool(),
             buildDeleteAllRunsTool(),
@@ -162,7 +163,58 @@ class TurboMcpServer(
     private fun buildStartRunTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run")
-            .description("Start a new Turbo Intruder attack run. This clears any previous runs and starts fresh. Use for single-run scenarios.")
+            .description("Start a new Turbo Intruder attack run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "script": {
+                        "type": "string",
+                        "description": "Python script code that controls the attack"
+                    },
+                    "base_request": {
+                        "type": "string",
+                        "description": "The base HTTP request template with injection points marked as %s"
+                    },
+                    "endpoint": {
+                        "type": "string",
+                        "description": "Target endpoint URL (e.g., https://example.com)"
+                    },
+                    "base_input": {
+                        "type": "string",
+                        "description": "Input data to feed into the script (e.g., wordlist content)"
+                    },
+                    "timeout_ms": {
+                        "type": "integer",
+                        "description": "Timeout in milliseconds (default: 60000). If exceeded, returns run_id for manual polling."
+                    }
+                },
+                "required": ["script", "base_request", "endpoint"]
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.startRun(
+                        script = args["script"] as? String ?: "",
+                        baseRequest = args["base_request"] as? String ?: "",
+                        endpoint = args["endpoint"] as? String ?: "",
+                        baseInput = args["base_input"] as? String ?: "",
+                        timeoutMs = (args["timeout_ms"] as? Number)?.toLong() ?: 60000
+                    )
+                }
+            }
+            .build()
+    }
+
+    private fun buildStartRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("start_run_async")
+            .description("Start a new Turbo Intruder attack run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -194,7 +246,7 @@ class TurboMcpServer(
             .callHandler { _, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
-                    toolHandlers.startRun(
+                    toolHandlers.startRunAsync(
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
@@ -205,7 +257,7 @@ class TurboMcpServer(
             .build()
     }
 
-    private fun buildStartConcurrentRunTool(): McpServerFeatures.SyncToolSpecification {
+    private fun buildStartConcurrentRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_concurrent_run")
             .description("Start a new concurrent attack run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
@@ -240,7 +292,7 @@ class TurboMcpServer(
             .callHandler { _, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
-                    toolHandlers.startConcurrentRun(
+                    toolHandlers.startConcurrentRunAsync(
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
