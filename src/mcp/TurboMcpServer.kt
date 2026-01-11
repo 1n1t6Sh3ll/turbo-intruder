@@ -145,7 +145,8 @@ class TurboMcpServer(
             buildListOrganizerItemsTool(),
             buildSaveToOrganizerTool(),
             buildGenerateCollaboratorPayloadTool(),
-            buildGetCollaboratorInteractionsTool()
+            buildGetCollaboratorInteractionsTool(),
+            buildSearchResponsesTool()
         )
     }
 
@@ -561,6 +562,42 @@ class TurboMcpServer(
                     @Suppress("UNCHECKED_CAST")
                     val payloads = args["payloads"] as? List<String>
                     toolHandlers.getCollaboratorInteractions(payloads)
+                }
+            }
+            .build()
+    }
+
+    private fun buildSearchResponsesTool(): McpServerFeatures.SyncToolSpecification {
+        val tool = McpSchema.Tool.builder()
+            .name("search_responses")
+            .description("Search all responses in a run for a specific string. Returns IDs of requests whose responses contain the search string.")
+            .inputSchema(jsonMapper, """
+            {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The string to search for in response bodies"
+                    },
+                    "run_id": {
+                        "type": "string",
+                        "description": "ID of the run to search. Omit for current run."
+                    }
+                },
+                "required": ["query"]
+            }
+            """.trimIndent())
+            .build()
+
+        return McpServerFeatures.SyncToolSpecification.builder()
+            .tool(tool)
+            .callHandler { _, request ->
+                executeToolWithErrorHandling {
+                    val args = request.arguments()
+                    toolHandlers.searchResponses(
+                        runId = args["run_id"] as? String,
+                        query = args["query"] as? String ?: ""
+                    )
                 }
             }
             .build()

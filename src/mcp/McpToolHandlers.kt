@@ -179,6 +179,23 @@ class McpToolHandlers(
         return mapOf("deleted_count" to manager.deleteAllRuns())
     }
 
+    fun searchResponses(runId: String?, query: String): Map<String, Any> {
+        val run = if (runId != null) {
+            manager.getRun(runId)
+        } else {
+            manager.currentRun
+        } ?: return mapOf("error" to "No run found")
+
+        val matches = run.store.getAllRquests()
+            .filter { it.response?.contains(query) == true }
+            .map { it.id }
+
+        return mapOf(
+            "matches" to matches,
+            "match_count" to matches.size
+        )
+    }
+
     private fun launchRun(
         run: ActiveRun,
         script: String,

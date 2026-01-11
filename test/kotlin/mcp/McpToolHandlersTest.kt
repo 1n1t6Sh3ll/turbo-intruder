@@ -290,6 +290,85 @@ def completed(results):
     }
 
     @Test
+    fun `searchResponses returns matching request IDs`() {
+        val run = manager.startRun()
+        val req1 = burp.Request("GET /page1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nHello World"
+        val req2 = burp.Request("GET /page2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 2
+        req2.response = "HTTP/1.1 200 OK\r\n\r\nGoodbye World"
+        val req3 = burp.Request("GET /page3 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req3.id = 3
+        req3.response = "HTTP/1.1 404 Not Found\r\n\r\nNot Found"
+        run.store.add(req1)
+        run.store.add(req2)
+        run.store.add(req3)
+
+        val result = handlers.searchResponses(runId = null, query = "World")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(listOf(1, 2), matches.sorted())
+        assertEquals(2, result["match_count"])
+    }
+
+    @Test
+    fun `searchResponses returns empty list when no matches`() {
+        val run = manager.startRun()
+        val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req.id = 1
+        req.response = "HTTP/1.1 200 OK\r\n\r\nHello"
+        run.store.add(req)
+
+        val result = handlers.searchResponses(runId = null, query = "notfound")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(emptyList<Int>(), matches)
+        assertEquals(0, result["match_count"])
+    }
+
+    @Test
+    fun `searchResponses handles null responses`() {
+        val run = manager.startRun()
+        val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req.id = 1
+        req.response = null
+        run.store.add(req)
+
+        val result = handlers.searchResponses(runId = null, query = "test")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(emptyList<Int>(), matches)
+    }
+
+    @Test
+    fun `searchResponses uses specified run`() {
+        val run1 = manager.startConcurrentRun()
+        val req1 = burp.Request("GET /run1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nFindMe"
+        run1.store.add(req1)
+
+        val run2 = manager.startConcurrentRun()
+        val req2 = burp.Request("GET /run2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 1
+        req2.response = "HTTP/1.1 200 OK\r\n\r\nNotThis"
+        run2.store.add(req2)
+
+        val result = handlers.searchResponses(runId = run1.id, query = "FindMe")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(listOf(1), matches)
+    }
+
+    @Test
+    fun `searchResponses returns error when no run found`() {
+        val result = handlers.searchResponses(runId = "nonexistent", query = "test")
+
+        assertEquals("No run found", result["error"])
+    }
+
+    @Test
     fun `saveToOrganizer uses specified run`() {
         val fakeOrganizer = FakeOrganizerProvider(emptyList())
         val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
