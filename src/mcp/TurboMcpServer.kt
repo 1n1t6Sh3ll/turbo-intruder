@@ -609,6 +609,7 @@ class TurboMcpServer(
             buildRunStatusResourceTemplate(),
             buildRunResultsResourceTemplate(),
             buildRequestDetailResourceTemplate(),
+            buildShorthandRequestDetailResourceTemplate(),
             buildDocsListResource(),
             buildDocTopicResourceTemplate()
         )
@@ -706,6 +707,26 @@ class TurboMcpServer(
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     uri,
+                    "application/json",
+                    jsonMapper.writeValueAsString(result)
+                ))
+            )
+        }
+    }
+
+    private fun buildShorthandRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://requests/{id}")
+            .name("Details of a specific request (shorthand)")
+            .description("Shorthand for turbo://runs/current/requests/{id}. Get request and response details from the current run.")
+            .mimeType("application/json")
+            .build()
+
+        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+            val result = resourceHandlers.handleResourceRead(request.uri())
+            McpSchema.ReadResourceResult(
+                listOf(McpSchema.TextResourceContents(
+                    request.uri(),
                     "application/json",
                     jsonMapper.writeValueAsString(result)
                 ))
