@@ -657,9 +657,9 @@ class TurboMcpServer(
 
     private fun buildRunResultsResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/results")
-            .name("Results from a run")
-            .description("Get paginated results from a run. Supports query params: sort_by (id|status|length|time|wordcount), descending (true|false), limit, offset")
+            .uri("turbo://runs/{run_id}/summary")
+            .name("Summary from a run")
+            .description("Get paginated summary from a run. Supports query params: sort_by (id|status|length|time|wordcount), descending (true|false), limit, offset")
             .mimeType("application/json")
             .build()
 

@@ -74,7 +74,7 @@ class McpResourceHandlersTest {
     @Test
     fun `parseUri extracts run_id correctly`() {
         assertEquals("abc123", handlers.parseRunId("turbo://runs/abc123"))
-        assertEquals("abc123", handlers.parseRunId("turbo://runs/abc123/results"))
+        assertEquals("abc123", handlers.parseRunId("turbo://runs/abc123/summary"))
         assertEquals("current", handlers.parseRunId("turbo://runs/current"))
         assertNull(handlers.parseRunId("turbo://runs"))
     }
@@ -82,12 +82,12 @@ class McpResourceHandlersTest {
     @Test
     fun `parseUri extracts request_id correctly`() {
         assertEquals(42, handlers.parseRequestId("turbo://runs/abc123/requests/42"))
-        assertNull(handlers.parseRequestId("turbo://runs/abc123/results"))
+        assertNull(handlers.parseRequestId("turbo://runs/abc123/summary"))
     }
 
     @Test
     fun `parseQueryParams extracts parameters`() {
-        val params = handlers.parseQueryParams("turbo://runs/abc/results?sort_by=status&limit=50")
+        val params = handlers.parseQueryParams("turbo://runs/abc/summary?sort_by=status&limit=50")
 
         assertEquals("status", params["sort_by"])
         assertEquals("50", params["limit"])
