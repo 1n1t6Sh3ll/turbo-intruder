@@ -396,6 +396,27 @@ def completed(results):
         assertEquals(1, fakeOrganizer.sentItems.size)
         assertTrue(fakeOrganizer.sentItems[0].first.template.contains("/run1"))
     }
+
+    @Test
+    fun `startRun results include anomaly_rank field`() {
+        // Use the ResourceHandlers to test the result structure directly
+        // since startRun() uses the same result mapping
+        val resourceHandlers = McpResourceHandlers(manager)
+        val run = manager.startRun()
+
+        val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req.id = 1
+        req.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        req.anomalyRank = 42
+        run.store.add(req)
+
+        val result = resourceHandlers.getResults(null, "id", true, 100, 0)
+        val results = result["results"] as List<Map<String, Any?>>
+
+        assertEquals(1, results.size)
+        assertTrue(results[0].containsKey("anomaly_rank"))
+        assertEquals(42, results[0]["anomaly_rank"])
+    }
 }
 
 // Test helpers

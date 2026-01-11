@@ -196,4 +196,54 @@ class McpResourceHandlersTest {
         assertNotNull(result["response_file"])
         assertNull(result["response_body"])
     }
+
+    @Test
+    fun `getResults includes anomaly_rank in results`() {
+        val run = manager.startRun()
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        request.anomalyRank = 42
+        run.store.add(request)
+
+        val result = handlers.getResults(null, "id", true, 100, 0)
+
+        val results = result["results"] as List<Map<String, Any?>>
+        assertEquals(1, results.size)
+        assertEquals(42, results[0]["anomaly_rank"])
+    }
+
+    @Test
+    fun `getResults defaults to sorting by anomaly_rank descending`() {
+        val run = manager.startRun()
+
+        val req1 = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        req1.anomalyRank = 10
+
+        val req2 = burp.Request("GET /2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 2
+        req2.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        req2.anomalyRank = 100
+
+        val req3 = burp.Request("GET /3 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req3.id = 3
+        req3.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        req3.anomalyRank = 50
+
+        run.store.add(req1)
+        run.store.add(req2)
+        run.store.add(req3)
+
+        // Use handleResourceRead with no sort_by param to test default
+        val result = handlers.handleResourceRead("turbo://runs/current/summary")
+
+        val results = result["results"] as List<Map<String, Any?>>
+        assertEquals(3, results.size)
+        // Should be sorted by anomaly_rank descending: 100, 50, 10
+        assertEquals(100, results[0]["anomaly_rank"])
+        assertEquals(50, results[1]["anomaly_rank"])
+        assertEquals(10, results[2]["anomaly_rank"])
+    }
 }

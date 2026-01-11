@@ -70,7 +70,8 @@ class McpResourceHandlers(private val manager: RunManager) {
                     "time" to req.time,
                     "wordcount" to req.wordcount,
                     "words" to req.words,
-                    "label" to req.label
+                    "label" to req.label,
+                    "anomaly_rank" to req.anomalyRank
                 )
             },
             "total_count" to run.store.count()
@@ -247,7 +248,7 @@ class McpResourceHandlers(private val manager: RunManager) {
                 val params = parseQueryParams(uri)
                 getResults(
                     runId = runId,
-                    sortBy = params["sort_by"] ?: "id",
+                    sortBy = params["sort_by"] ?: "anomaly_rank",
                     descending = params["descending"] != "false",
                     limit = params["limit"]?.toIntOrNull() ?: 100,
                     offset = params["offset"]?.toIntOrNull() ?: 0

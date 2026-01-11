@@ -74,16 +74,13 @@ processResources {
 
 jar {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
-
-task fatJar(type: Jar) {
-    dependsOn test
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    archiveFileName = 'turbo-intruder-all.jar'
+    archiveFileName = 'turbo-intruder.jar'
     manifest {
         attributes('Main-Class': 'burp.Fast_httpKt')
     }
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
 }
+
+// Ensure tests run before build
+build.dependsOn test
 

@@ -2,9 +2,8 @@
 
 ## Building
 
-Always use the fatJar task for all builds:
 ```bash
-./gradlew fatJar
+./gradlew jar
 ```
 
 The output JAR is at `build/libs/turbo-intruder.jar`.
@@ -13,7 +12,7 @@ The output JAR is at `build/libs/turbo-intruder.jar`.
 
 Build and run:
 ```bash
-./gradlew fatJar
+./gradlew jar
 java -jar build/libs/turbo-intruder.jar --mcp
 ```
 

@@ -122,8 +122,8 @@ class McpToolHandlers(
             Thread.sleep(50)
         }
 
-        // Get results
-        val results = run.store.getResults(burp.SortField.ID, false, 100, 0)
+        // Get results sorted by anomaly rank descending
+        val results = run.store.getResults(burp.SortField.ANOMALY_RANK, true, 100, 0)
         return mapOf(
             "status" to "completed",
             "run_id" to run.id,
@@ -136,7 +136,8 @@ class McpToolHandlers(
                     "time" to req.time,
                     "wordcount" to req.wordcount,
                     "words" to req.words,
-                    "label" to req.label
+                    "label" to req.label,
+                    "anomaly_rank" to req.anomalyRank
                 )
             }
         )
