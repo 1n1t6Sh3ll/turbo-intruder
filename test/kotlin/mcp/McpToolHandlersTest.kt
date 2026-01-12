@@ -16,66 +16,6 @@ class McpToolHandlersTest {
     }
 
     @Test
-    fun `getOrganizerItems returns items matching requested IDs`() {
-        val fakeOrganizer = FakeOrganizerProvider(listOf(
-            FakeOrganizerItem(100, "GET /page1 HTTP/1.1", "HTTP/1.1 200 OK"),
-            FakeOrganizerItem(101, "GET /page2 HTTP/1.1", "HTTP/1.1 404 Not Found"),
-            FakeOrganizerItem(102, "POST /api HTTP/1.1", "HTTP/1.1 201 Created"),
-            FakeOrganizerItem(103, "GET /other HTTP/1.1", "HTTP/1.1 200 OK")
-        ))
-        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
-
-        val result = handlersWithOrganizer.getOrganizerItems("100,101,102")
-
-        assertEquals(3, (result["items"] as List<*>).size)
-        val items = result["items"] as List<Map<String, Any?>>
-        assertEquals(100, items[0]["id"])
-        assertEquals(101, items[1]["id"])
-        assertEquals(102, items[2]["id"])
-    }
-
-    @Test
-    fun `getOrganizerItems returns empty list when no matching IDs`() {
-        val fakeOrganizer = FakeOrganizerProvider(listOf(
-            FakeOrganizerItem(100, "GET / HTTP/1.1", "HTTP/1.1 200 OK")
-        ))
-        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
-
-        val result = handlersWithOrganizer.getOrganizerItems("999,998")
-
-        assertEquals(0, (result["items"] as List<*>).size)
-    }
-
-    @Test
-    fun `getOrganizerItems handles single ID`() {
-        val fakeOrganizer = FakeOrganizerProvider(listOf(
-            FakeOrganizerItem(42, "GET /test HTTP/1.1", "HTTP/1.1 200 OK")
-        ))
-        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
-
-        val result = handlersWithOrganizer.getOrganizerItems("42")
-
-        assertEquals(1, (result["items"] as List<*>).size)
-        val items = result["items"] as List<Map<String, Any?>>
-        assertEquals(42, items[0]["id"])
-        assertEquals("GET /test HTTP/1.1", items[0]["request"])
-        assertEquals("HTTP/1.1 200 OK", items[0]["response"])
-    }
-
-    @Test
-    fun `getOrganizerItems returns notes`() {
-        val fakeOrganizer = FakeOrganizerProvider(listOf(
-            FakeOrganizerItem(1, "GET / HTTP/1.1", "HTTP/1.1 200 OK", "Interesting finding")
-        ))
-        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
-
-        val result = handlersWithOrganizer.getOrganizerItems("1")
-
-        val items = result["items"] as List<Map<String, Any?>>
-        assertEquals("Interesting finding", items[0]["notes"])
-    }
-
-    @Test
     fun `setOrganizerNotes updates notes on item`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(1, "GET / HTTP/1.1", "HTTP/1.1 200 OK", "Old note")
@@ -96,33 +36,6 @@ class McpToolHandlersTest {
         val result = handlersWithOrganizer.setOrganizerNotes(999, "Note")
 
         assertEquals("not_found", result["error"])
-    }
-
-    @Test
-    fun `listOrganizerItems returns all item IDs`() {
-        val fakeOrganizer = FakeOrganizerProvider(listOf(
-            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK"),
-            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK"),
-            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK")
-        ))
-        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
-
-        val result = handlersWithOrganizer.listOrganizerItems()
-
-        assertEquals(3, result["count"])
-        val items = result["items"] as List<Map<String, Any?>>
-        assertEquals(listOf(1, 2, 3), items.map { it["id"] })
-    }
-
-    @Test
-    fun `listOrganizerItems returns empty list when no items`() {
-        val fakeOrganizer = FakeOrganizerProvider(emptyList())
-        val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
-
-        val result = handlersWithOrganizer.listOrganizerItems()
-
-        assertEquals(0, result["count"])
-        assertEquals(emptyList<Any>(), result["items"])
     }
 
     @Test
@@ -424,7 +337,10 @@ data class FakeOrganizerItem(
     val id: Int,
     val request: String,
     val response: String,
-    var notes: String = ""
+    var notes: String = "",
+    val host: String = "example.com",
+    val port: Int = 443,
+    val secure: Boolean = true
 )
 
 class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider {
@@ -432,11 +348,11 @@ class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider 
     val sentItems = mutableListOf<Pair<burp.Request, String>>()
 
     override fun getItems(): List<OrganizerItemData> {
-        return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
+        return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes, it.host, it.port, it.secure) }
     }
 
     override fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData> {
-        return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response, it.notes) }
+        return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response, it.notes, it.host, it.port, it.secure) }
     }
 
     override fun setNotes(id: Int, notes: String): Boolean {

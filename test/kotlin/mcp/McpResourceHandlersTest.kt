@@ -260,4 +260,113 @@ class McpResourceHandlersTest {
         assertEquals(50, results[1]["anomaly_rank"])
         assertEquals(10, results[2]["anomaly_rank"])
     }
+
+    // Organizer resource tests
+
+    @Test
+    fun `listOrganizerItems returns all items`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems()
+
+        assertEquals(3, result["count"])
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(listOf(1, 2, 3), items.map { it["id"] })
+    }
+
+    @Test
+    fun `listOrganizerItems returns empty list when no items`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems()
+
+        assertEquals(0, result["count"])
+        assertEquals(emptyList<Any>(), result["items"])
+    }
+
+    @Test
+    fun `handleResourceRead routes turbo organizer to listOrganizerItems`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(42, "GET /test HTTP/1.1", "HTTP/1.1 200 OK")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.handleResourceRead("turbo://organizer")
+
+        assertEquals(1, result["count"])
+    }
+
+    @Test
+    fun `getOrganizerItem returns item by id`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(100, "GET /page1 HTTP/1.1", "HTTP/1.1 200 OK", "Test notes")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(100)
+
+        assertEquals(100, result["id"])
+        assertEquals("GET /page1 HTTP/1.1", result["request"])
+        assertEquals("HTTP/1.1 200 OK", result["response"])
+        assertEquals("Test notes", result["notes"])
+    }
+
+    @Test
+    fun `getOrganizerItem returns error for non-existent item`() {
+        val fakeOrganizer = FakeOrganizerProvider(emptyList())
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(999)
+
+        assertEquals("not_found", result["error"])
+    }
+
+    @Test
+    fun `handleResourceRead routes turbo organizer id to getOrganizerItem`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(42, "GET /test HTTP/1.1", "HTTP/1.1 200 OK")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.handleResourceRead("turbo://organizer/42")
+
+        assertEquals(42, result["id"])
+        assertEquals("GET /test HTTP/1.1", result["request"])
+    }
+
+    @Test
+    fun `parseOrganizerId extracts id from URI`() {
+        assertEquals(42, handlers.parseOrganizerId("turbo://organizer/42"))
+        assertEquals(100, handlers.parseOrganizerId("turbo://organizer/100"))
+        assertNull(handlers.parseOrganizerId("turbo://organizer"))
+        assertNull(handlers.parseOrganizerId("turbo://organizer/"))
+    }
+
+    @Test
+    fun `getOrganizerItem returns http service info`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 100,
+                request = "GET /page1 HTTP/1.1",
+                response = "HTTP/1.1 200 OK",
+                notes = "Test",
+                host = "example.com",
+                port = 443,
+                secure = true
+            )
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(100)
+
+        assertEquals("example.com", result["host"])
+        assertEquals(443, result["port"])
+        assertEquals(true, result["secure"])
+    }
 }

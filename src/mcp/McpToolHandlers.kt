@@ -11,24 +11,6 @@ class McpToolHandlers(
     private val collaboratorProvider: CollaboratorProvider? = null
 ) {
 
-    fun getOrganizerItems(ids: String): Map<String, Any?> {
-        val idSet = ids.split(",")
-            .mapNotNull { it.trim().toIntOrNull() }
-            .toSet()
-
-        val items = organizerProvider.getItemsByIds(idSet)
-        return mapOf(
-            "items" to items.map { item ->
-                mapOf(
-                    "id" to item.id,
-                    "request" to item.request,
-                    "response" to item.response,
-                    "notes" to item.notes
-                )
-            }
-        )
-    }
-
     fun setOrganizerNotes(id: Int, notes: String): Map<String, String> {
         val success = organizerProvider.setNotes(id, notes)
         return if (success) {
@@ -36,14 +18,6 @@ class McpToolHandlers(
         } else {
             mapOf("error" to "not_found")
         }
-    }
-
-    fun listOrganizerItems(): Map<String, Any> {
-        val items = organizerProvider.getItems()
-        return mapOf(
-            "count" to items.size,
-            "items" to items.map { mapOf("id" to it.id) }
-        )
     }
 
     fun generateCollaboratorPayload(metadata: String): Map<String, Any?> {

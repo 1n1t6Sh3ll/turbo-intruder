@@ -7,7 +7,10 @@ data class OrganizerItemData(
     val id: Int,
     val request: String,
     val response: String,
-    val notes: String
+    val notes: String,
+    val host: String,
+    val port: Int,
+    val secure: Boolean
 )
 
 interface OrganizerProvider {
@@ -21,11 +24,15 @@ class BurpOrganizerProvider : OrganizerProvider {
     override fun getItems(): List<OrganizerItemData> {
         val organizer = Utils.montoyaApi?.organizer() ?: return emptyList()
         return organizer.items().map { item ->
+            val httpService = item.request()?.httpService()
             OrganizerItemData(
                 id = item.id(),
                 request = item.request()?.toString() ?: "",
                 response = item.response()?.toString() ?: "",
-                notes = item.annotations()?.notes() ?: ""
+                notes = item.annotations()?.notes() ?: "",
+                host = httpService?.host() ?: "",
+                port = httpService?.port() ?: 0,
+                secure = httpService?.secure() ?: false
             )
         }
     }
@@ -34,11 +41,15 @@ class BurpOrganizerProvider : OrganizerProvider {
         val organizer = Utils.montoyaApi?.organizer() ?: return emptyList()
         val filter = OrganizerItemFilter { item -> item.id() in ids }
         return organizer.items(filter).map { item ->
+            val httpService = item.request()?.httpService()
             OrganizerItemData(
                 id = item.id(),
                 request = item.request()?.toString() ?: "",
                 response = item.response()?.toString() ?: "",
-                notes = item.annotations()?.notes() ?: ""
+                notes = item.annotations()?.notes() ?: "",
+                host = httpService?.host() ?: "",
+                port = httpService?.port() ?: 0,
+                secure = httpService?.secure() ?: false
             )
         }
     }

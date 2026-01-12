@@ -40,12 +40,13 @@ fun formatErrorWithStackTrace(e: Exception): Map<String, Any?> {
 class TurboMcpServer(
     private val port: Int = 31338,
     private val disabledTools: Set<String> = emptySet(),
-    private val collaboratorProvider: CollaboratorProvider? = null
+    private val collaboratorProvider: CollaboratorProvider? = null,
+    private val organizerProvider: OrganizerProvider = BurpOrganizerProvider()
 ) {
 
     private val manager = RunManager()
-    val toolHandlers = McpToolHandlers(manager, collaboratorProvider = collaboratorProvider)
-    val resourceHandlers = McpResourceHandlers(manager)
+    val toolHandlers = McpToolHandlers(manager, organizerProvider, collaboratorProvider)
+    val resourceHandlers = McpResourceHandlers(manager, organizerProvider)
 
     private var server: McpSyncServer? = null
     private var jettyServer: Server? = null
@@ -140,9 +141,7 @@ class TurboMcpServer(
             buildStopRunTool(),
             buildDeleteRunTool(),
             buildDeleteAllRunsTool(),
-            buildGetOrganizerItemsTool(),
             buildSetOrganizerNotesTool(),
-            buildListOrganizerItemsTool(),
             buildSaveToOrganizerTool(),
             buildGenerateCollaboratorPayloadTool(),
             buildGetCollaboratorInteractionsTool(),
@@ -380,37 +379,6 @@ class TurboMcpServer(
             .build()
     }
 
-    private fun buildGetOrganizerItemsTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("get_organizer_items")
-            .description("Retrieve items from Burp's Organizer by their IDs. Returns the full request, response, and notes for each item.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "ids": {
-                        "type": "string",
-                        "description": "Comma-separated list of Organizer item IDs to retrieve (e.g., '100,101,102')"
-                    }
-                },
-                "required": ["ids"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.getOrganizerItems(
-                        ids = args["ids"] as? String ?: ""
-                    )
-                }
-            }
-            .build()
-    }
-
     private fun buildSetOrganizerNotesTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("set_organizer_notes")
@@ -442,28 +410,6 @@ class TurboMcpServer(
                         id = (args["id"] as? Number)?.toInt() ?: 0,
                         notes = args["notes"] as? String ?: ""
                     )
-                }
-            }
-            .build()
-    }
-
-    private fun buildListOrganizerItemsTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("list_organizer_items")
-            .description("List all items in Burp's Organizer. Returns item IDs and count.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {}
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, _ ->
-                executeToolWithErrorHandling {
-                    toolHandlers.listOrganizerItems()
                 }
             }
             .build()
@@ -610,6 +556,8 @@ class TurboMcpServer(
             buildRunResultsResourceTemplate(),
             buildRequestDetailResourceTemplate(),
             buildShorthandRequestDetailResourceTemplate(),
+            buildOrganizerListResource(),
+            buildOrganizerItemResourceTemplate(),
             buildDocsListResource(),
             buildDocTopicResourceTemplate()
         )
@@ -724,6 +672,51 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
             val result = resourceHandlers.handleResourceRead(request.uri())
+            McpSchema.ReadResourceResult(
+                listOf(McpSchema.TextResourceContents(
+                    request.uri(),
+                    "application/json",
+                    jsonMapper.writeValueAsString(result)
+                ))
+            )
+        }
+    }
+
+    private fun buildOrganizerListResource(): McpServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://organizer")
+            .name("List of all Organizer items")
+            .description("List all items in Burp's Organizer with their IDs")
+            .mimeType("application/json")
+            .build()
+
+        return McpServerFeatures.SyncResourceSpecification(resource) { _, _ ->
+            val result = resourceHandlers.listOrganizerItems()
+            McpSchema.ReadResourceResult(
+                listOf(McpSchema.TextResourceContents(
+                    "turbo://organizer",
+                    "application/json",
+                    jsonMapper.writeValueAsString(result)
+                ))
+            )
+        }
+    }
+
+    private fun buildOrganizerItemResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://organizer/{id}")
+            .name("Details of an Organizer item")
+            .description("Get the full request, response, and notes for an Organizer item by ID")
+            .mimeType("application/json")
+            .build()
+
+        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+            val organizerId = resourceHandlers.parseOrganizerId(request.uri())
+            val result = if (organizerId != null) {
+                resourceHandlers.getOrganizerItem(organizerId)
+            } else {
+                mapOf("error" to "invalid_organizer_id")
+            }
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     request.uri(),

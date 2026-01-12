@@ -4,7 +4,10 @@ import burp.SortField
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
-class McpResourceHandlers(private val manager: RunManager) {
+class McpResourceHandlers(
+    private val manager: RunManager,
+    private val organizerProvider: OrganizerProvider? = null
+) {
 
     private val docTopics = mapOf(
         "api-quickstart" to "Quick reference for scripting",
@@ -141,6 +144,32 @@ class McpResourceHandlers(private val manager: RunManager) {
         }
     }
 
+    // Organizer resources
+
+    fun listOrganizerItems(): Map<String, Any> {
+        val items = organizerProvider?.getItems() ?: emptyList()
+        return mapOf(
+            "count" to items.size,
+            "items" to items.map { mapOf("id" to it.id) }
+        )
+    }
+
+    fun getOrganizerItem(id: Int): Map<String, Any?> {
+        val items = organizerProvider?.getItemsByIds(setOf(id)) ?: emptyList()
+        val item = items.firstOrNull()
+            ?: return mapOf("error" to "not_found")
+
+        return mapOf(
+            "id" to item.id,
+            "request" to item.request,
+            "response" to item.response,
+            "notes" to item.notes,
+            "host" to item.host,
+            "port" to item.port,
+            "secure" to item.secure
+        )
+    }
+
     // Documentation resources
 
     fun listDocs(): Map<String, Any> {
@@ -224,9 +253,19 @@ class McpResourceHandlers(private val manager: RunManager) {
         return match?.groupValues?.get(1)
     }
 
+    fun parseOrganizerId(uri: String): Int? {
+        val match = Regex("turbo://organizer/(\\d+)").find(uri)
+        return match?.groupValues?.get(1)?.toIntOrNull()
+    }
+
     fun handleResourceRead(uri: String): Map<String, Any?> {
         return when {
             uri == "turbo://runs" -> listRuns()
+            uri == "turbo://organizer" -> listOrganizerItems()
+            uri.matches(Regex("turbo://organizer/\\d+")) -> {
+                val organizerId = parseOrganizerId(uri) ?: return mapOf("error" to "invalid_organizer_id")
+                getOrganizerItem(organizerId)
+            }
             uri == "turbo://docs" -> listDocs()
             uri.matches(Regex("turbo://docs/[^/]+")) -> {
                 val topic = parseDocTopic(uri) ?: return mapOf("error" to "invalid_topic")
