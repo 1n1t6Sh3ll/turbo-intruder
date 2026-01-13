@@ -528,6 +528,7 @@ fun main(args : Array<String>) {
     if (args.contains("--mcp")) {
         val server = mcp.TurboMcpServer(port = 31338)
         server.start()
+        println("MCP server listening on http://localhost:31338")
 
         Runtime.getRuntime().addShutdownHook(Thread {
             server.stop()

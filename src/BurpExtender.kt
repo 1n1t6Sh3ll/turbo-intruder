@@ -52,6 +52,7 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
             collaboratorProvider = mcp.BurpCollaboratorProvider()
         )
         mcpServer?.start()
+        Utils.out("MCP server listening on http://localhost:31337")
     }
 
     override fun initialize(montoyaApi: MontoyaApi) {
