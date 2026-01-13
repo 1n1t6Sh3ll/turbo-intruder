@@ -21,6 +21,7 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
 import java.io.PrintWriter
 import java.io.StringWriter
+import java.time.Duration
 import java.util.EnumSet
 
 /**
@@ -94,6 +95,7 @@ class TurboMcpServer(
         val transportProvider = HttpServletStreamableServerTransportProvider.builder()
             .jsonMapper(jsonMapper)
             .mcpEndpoint("/")
+            .keepAliveInterval(Duration.ofSeconds(30))
             .build()
 
         // Set up servlet context
