@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.*
 class McpIntegrationTest {
 
     private lateinit var server: TurboMcpServer
+    private val testSessionId = "test-session"
 
     @BeforeEach
     fun setup() {
@@ -19,7 +20,7 @@ class McpIntegrationTest {
     // Helper to get the first result's ID (getRequestDetail now looks up by ID, not index)
     @Suppress("UNCHECKED_CAST")
     private fun getFirstResultId(): Int {
-        val results = server.resourceHandlers.getResults(null, "id", false, 1, 0)
+        val results = server.resourceHandlers.getResults(testSessionId, null, "id", false, 1, 0)
         val resultsList = results["results"] as List<Map<String, Any?>>
         return resultsList.first()["id"] as Int
     }
@@ -28,6 +29,7 @@ class McpIntegrationTest {
     fun `tool handlers work end to end`() {
         // Test via handlers directly since HTTP client setup is complex
         val result = server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
@@ -39,26 +41,28 @@ class McpIntegrationTest {
     @Test
     fun `resource handlers work end to end`() {
         server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
             baseInput = ""
         )
 
-        val status = server.resourceHandlers.getRunStatus(null)
+        val status = server.resourceHandlers.getRunStatus(testSessionId, null)
         assertNotNull(status["run_id"])
     }
 
     @Test
     fun `resource URI routing works`() {
         server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
             baseInput = ""
         )
 
-        val result = server.resourceHandlers.handleResourceRead("turbo://runs/current")
+        val result = server.resourceHandlers.handleResourceRead(testSessionId, "turbo://runs/current")
         assertNotNull(result["run_id"])
     }
 
@@ -81,6 +85,7 @@ def handleResponse(req, interesting):
         val baseRequest = "GET /static/robots.txt HTTP/1.1\r\nHost: hackxor.net\r\nConnection: close\r\n\r\n"
 
         val result = server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = script,
             baseRequest = baseRequest,
             endpoint = "https://hackxor.net:443",
@@ -91,23 +96,23 @@ def handleResponse(req, interesting):
         // Wait for run to complete
         var attempts = 0
         while (attempts < 30) {
-            val status = server.resourceHandlers.getRunStatus(null)
+            val status = server.resourceHandlers.getRunStatus(testSessionId, null)
             if (status["finished"] == true && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
-        val status = server.resourceHandlers.getRunStatus(null)
+        val status = server.resourceHandlers.getRunStatus(testSessionId, null)
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId()
-        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
+        val detail = server.resourceHandlers.getRequestDetail(testSessionId, null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         // Response is now split into headers and body (truncated to body_limit, default 100 chars)
         // For this test, we need more body, so call with higher limit
-        val detailFull = server.resourceHandlers.getRequestDetail(null, requestId, bodyLimit = 10000)
+        val detailFull = server.resourceHandlers.getRequestDetail(testSessionId, null, requestId, bodyLimit = 10000)
         val responseBody = detailFull["response_body"] as String
         assertTrue(responseBody.contains("User-agent: *"), "Response should contain User-agent directive")
         assertTrue(responseBody.contains("Disallow: /settings"), "Response should contain Disallow /settings")
@@ -133,6 +138,7 @@ def handleResponse(req, interesting):
         val baseRequest = "POST /static/test HTTP/1.1\r\nHost: hackxor.net\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 20\r\nConnection: close\r\n\r\nXXXXXXXXXXXXXXXXXXXX"
 
         val result = server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = script,
             baseRequest = baseRequest,
             endpoint = "https://hackxor.net:443",
@@ -143,18 +149,18 @@ def handleResponse(req, interesting):
         // Wait for run to complete
         var attempts = 0
         while (attempts < 30) {
-            val status = server.resourceHandlers.getRunStatus(null)
+            val status = server.resourceHandlers.getRunStatus(testSessionId, null)
             if (status["finished"] == true && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
-        val status = server.resourceHandlers.getRunStatus(null)
+        val status = server.resourceHandlers.getRunStatus(testSessionId, null)
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId()
-        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
+        val detail = server.resourceHandlers.getRequestDetail(testSessionId, null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val request = detail["request"] as String
@@ -189,6 +195,7 @@ def handleResponse(req, interesting):
         val baseRequest = "POST /static/test HTTP/1.1\nHost: hackxor.net\nContent-Type: application/x-www-form-urlencoded\nContent-Length: 20\nConnection: close\n\nXXXXXXXXXXXXXXXXXXXX"
 
         val result = server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = script,
             baseRequest = baseRequest,
             endpoint = "https://hackxor.net:443",
@@ -199,18 +206,18 @@ def handleResponse(req, interesting):
         // Wait for run to complete
         var attempts = 0
         while (attempts < 30) {
-            val status = server.resourceHandlers.getRunStatus(null)
+            val status = server.resourceHandlers.getRunStatus(testSessionId, null)
             if (status["finished"] == true && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
-        val status = server.resourceHandlers.getRunStatus(null)
+        val status = server.resourceHandlers.getRunStatus(testSessionId, null)
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId()
-        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
+        val detail = server.resourceHandlers.getRequestDetail(testSessionId, null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val request = detail["request"] as String
@@ -241,6 +248,7 @@ def handleResponse(req, interesting):
             "    table.add(req)\r\n"
 
         val result = server.toolHandlers.startRunAsync(
+            sessionId = testSessionId,
             script = script,
             baseRequest = "GET / HTTP/1.1\r\nHost: hackxor.net\r\n\r\n",
             endpoint = "https://hackxor.net:443",
@@ -251,18 +259,18 @@ def handleResponse(req, interesting):
         // Wait for run to complete
         var attempts = 0
         while (attempts < 30) {
-            val status = server.resourceHandlers.getRunStatus(null)
+            val status = server.resourceHandlers.getRunStatus(testSessionId, null)
             if (status["finished"] == true && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
-        val status = server.resourceHandlers.getRunStatus(null)
+        val status = server.resourceHandlers.getRunStatus(testSessionId, null)
         assertEquals(true, status["finished"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId()
-        val detail = server.resourceHandlers.getRequestDetail(null, requestId)
+        val detail = server.resourceHandlers.getRequestDetail(testSessionId, null, requestId)
         assertNull(detail["error"], "Should not have error: ${detail["error"]}")
 
         val request = detail["request"] as String

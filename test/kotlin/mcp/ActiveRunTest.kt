@@ -9,8 +9,8 @@ class ActiveRunTest {
 
     @Test
     fun `creates ActiveRun with unique id`() {
-        val run1 = ActiveRun()
-        val run2 = ActiveRun()
+        val run1 = ActiveRun("test-session")
+        val run2 = ActiveRun("test-session")
 
         assertNotNull(run1.id)
         assertNotNull(run2.id)
@@ -19,7 +19,7 @@ class ActiveRunTest {
 
     @Test
     fun `provides access to RunHandler and ResultStore`() {
-        val run = ActiveRun()
+        val run = ActiveRun("test-session")
 
         assertNotNull(run.handler)
         assertNotNull(run.store)
@@ -28,7 +28,7 @@ class ActiveRunTest {
     @Test
     fun `tracks creation time`() {
         val before = System.currentTimeMillis()
-        val run = ActiveRun()
+        val run = ActiveRun("test-session")
         val after = System.currentTimeMillis()
 
         assertTrue(run.createdAt >= before)

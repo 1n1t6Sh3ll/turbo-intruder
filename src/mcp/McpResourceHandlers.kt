@@ -19,8 +19,8 @@ class McpResourceHandlers(
         "misc" to "Wordlists and utilities"
     )
 
-    fun listRuns(): Map<String, Any> {
-        val runs = manager.getAllRuns().map { run ->
+    fun listRuns(sessionId: String): Map<String, Any> {
+        val runs = manager.getAllRuns(sessionId).map { run ->
             mapOf(
                 "run_id" to run.id,
                 "running" to run.handler.isRunning(),
@@ -32,8 +32,8 @@ class McpResourceHandlers(
         return mapOf("runs" to runs)
     }
 
-    fun getRunStatus(runId: String?): Map<String, Any?> {
-        val run = manager.getRun(runId)
+    fun getRunStatus(sessionId: String, runId: String?): Map<String, Any?> {
+        val run = manager.getRun(sessionId, runId)
             ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
 
         return mapOf(
@@ -47,13 +47,14 @@ class McpResourceHandlers(
     }
 
     fun getResults(
+        sessionId: String,
         runId: String?,
         sortBy: String,
         descending: Boolean,
         limit: Int,
         offset: Int
     ): Map<String, Any?> {
-        val run = manager.getRun(runId)
+        val run = manager.getRun(sessionId, runId)
             ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
 
         val sortField = try {
@@ -82,12 +83,13 @@ class McpResourceHandlers(
     }
 
     fun getRequestDetail(
+        sessionId: String,
         runId: String?,
         requestId: Int,
         bodyLimit: Int = 100,
         exportFile: Boolean = false
     ): Map<String, Any?> {
-        val run = manager.getRun(runId)
+        val run = manager.getRun(sessionId, runId)
             ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
 
         val request = run.store.getRequest(requestId)
@@ -258,9 +260,9 @@ class McpResourceHandlers(
         return match?.groupValues?.get(1)?.toIntOrNull()
     }
 
-    fun handleResourceRead(uri: String): Map<String, Any?> {
+    fun handleResourceRead(sessionId: String, uri: String): Map<String, Any?> {
         return when {
-            uri == "turbo://runs" -> listRuns()
+            uri == "turbo://runs" -> listRuns(sessionId)
             uri == "turbo://organizer" -> listOrganizerItems()
             uri.matches(Regex("turbo://organizer/\\d+")) -> {
                 val organizerId = parseOrganizerId(uri) ?: return mapOf("error" to "invalid_organizer_id")
@@ -276,6 +278,7 @@ class McpResourceHandlers(
                     ?: return mapOf("error" to "invalid_request_id")
                 val params = parseQueryParams(uri)
                 getRequestDetail(
+                    sessionId = sessionId,
                     runId = null,
                     requestId = requestId,
                     bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
@@ -287,6 +290,7 @@ class McpResourceHandlers(
                 val requestId = parseRequestId(uri) ?: return mapOf("error" to "invalid_request_id")
                 val params = parseQueryParams(uri)
                 getRequestDetail(
+                    sessionId = sessionId,
                     runId = runId,
                     requestId = requestId,
                     bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
@@ -297,6 +301,7 @@ class McpResourceHandlers(
                 val runId = parseRunId(uri)
                 val params = parseQueryParams(uri)
                 getResults(
+                    sessionId = sessionId,
                     runId = runId,
                     sortBy = params["sort_by"] ?: "anomaly_rank",
                     descending = params["descending"] != "false",
@@ -306,7 +311,7 @@ class McpResourceHandlers(
             }
             uri.matches(Regex("turbo://runs/[^/]+.*")) -> {
                 val runId = parseRunId(uri)
-                getRunStatus(runId)
+                getRunStatus(sessionId, runId)
             }
             else -> mapOf("error" to "unknown_resource")
         }

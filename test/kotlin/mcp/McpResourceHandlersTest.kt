@@ -8,6 +8,7 @@ class McpResourceHandlersTest {
 
     private lateinit var manager: RunManager
     private lateinit var handlers: McpResourceHandlers
+    private val testSessionId = "test-session"
 
     @BeforeEach
     fun setup() {
@@ -17,17 +18,17 @@ class McpResourceHandlersTest {
 
     @Test
     fun `listRuns returns empty when no runs`() {
-        val result = handlers.listRuns()
+        val result = handlers.listRuns(testSessionId)
 
         assertTrue((result["runs"] as List<*>).isEmpty())
     }
 
     @Test
     fun `listRuns returns all runs`() {
-        manager.startConcurrentRun()
-        manager.startConcurrentRun()
+        manager.startConcurrentRun(testSessionId)
+        manager.startConcurrentRun(testSessionId)
 
-        val result = handlers.listRuns()
+        val result = handlers.listRuns(testSessionId)
         val runs = result["runs"] as List<*>
 
         assertEquals(2, runs.size)
@@ -35,16 +36,16 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRunStatus returns error for no current run`() {
-        val result = handlers.getRunStatus(null)
+        val result = handlers.getRunStatus(testSessionId, null)
 
         assertEquals("no_current_run", result["error"])
     }
 
     @Test
     fun `getRunStatus returns run info`() {
-        manager.startRun()
+        manager.startRun(testSessionId)
 
-        val result = handlers.getRunStatus(null)
+        val result = handlers.getRunStatus(testSessionId, null)
 
         assertNotNull(result["run_id"])
         assertNotNull(result["running"])
@@ -54,9 +55,9 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults returns empty list when no results`() {
-        manager.startRun()
+        manager.startRun(testSessionId)
 
-        val result = handlers.getResults(null, "id", true, 100, 0)
+        val result = handlers.getResults(testSessionId, null, "id", true, 100, 0)
 
         assertEquals(0, result["total_count"])
         assertTrue((result["results"] as List<*>).isEmpty())
@@ -64,9 +65,9 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail returns error for invalid request`() {
-        manager.startRun()
+        manager.startRun(testSessionId)
 
-        val result = handlers.getRequestDetail(null, 999)
+        val result = handlers.getRequestDetail(testSessionId, null, 999)
 
         assertEquals("request_not_found", result["error"])
     }
@@ -95,14 +96,14 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail returns headers and truncated body by default`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" +
             "A".repeat(500)  // 500-char body
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(null, 1, bodyLimit = 100)
+        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
 
         assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
         assertEquals("A".repeat(100), result["response_body"])
@@ -111,40 +112,40 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail respects custom body_limit`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "B".repeat(1000)
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(null, 1, bodyLimit = 250)
+        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 250)
 
         assertEquals("B".repeat(250), result["response_body"])
     }
 
     @Test
     fun `getRequestDetail returns full body when shorter than limit`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nshort"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(null, 1, bodyLimit = 100)
+        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
 
         assertEquals("short", result["response_body"])
     }
 
     @Test
     fun `getRequestDetail with exportFile writes response to file and returns path`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         val fullResponse = "HTTP/1.1 200 OK\r\n\r\n" + "X".repeat(1000)
         request.response = fullResponse
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(null, 1, exportFile = true)
+        val result = handlers.getRequestDetail(testSessionId, null, 1, exportFile = true)
 
         assertNotNull(result["response_file"])
         val filePath = result["response_file"] as String
@@ -156,13 +157,13 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail with exportFile also exports request`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET /test HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nok"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(null, 1, exportFile = true)
+        val result = handlers.getRequestDetail(testSessionId, null, 1, exportFile = true)
 
         assertNotNull(result["request_file"])
         val filePath = result["request_file"] as String
@@ -172,26 +173,26 @@ class McpResourceHandlersTest {
 
     @Test
     fun `handleResourceRead parses body_limit from URI`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "Z".repeat(500)
         run.store.add(request)
 
-        val result = handlers.handleResourceRead("turbo://runs/current/requests/1?body_limit=50")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/requests/1?body_limit=50")
 
         assertEquals("Z".repeat(50), result["response_body"])
     }
 
     @Test
     fun `handleResourceRead parses export param from URI`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\ndata"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead("turbo://runs/current/requests/1?export=file")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/requests/1?export=file")
 
         assertNotNull(result["response_file"])
         assertNull(result["response_body"])
@@ -199,14 +200,14 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults includes anomaly_rank in results`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nok"
         request.anomalyRank = 42
         run.store.add(request)
 
-        val result = handlers.getResults(null, "id", true, 100, 0)
+        val result = handlers.getResults(testSessionId, null, "id", true, 100, 0)
 
         val results = result["results"] as List<Map<String, Any?>>
         assertEquals(1, results.size)
@@ -215,13 +216,13 @@ class McpResourceHandlersTest {
 
     @Test
     fun `handleResourceRead supports shorthand turbo requests id for current run`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 36
         request.response = "HTTP/1.1 200 OK\r\n\r\ntest body"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead("turbo://requests/36")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://requests/36")
 
         assertEquals("test body", result["response_body"])
         assertEquals(200, result["status"])
@@ -229,7 +230,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults defaults to sorting by anomaly_rank descending`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
 
         val req1 = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
@@ -251,7 +252,7 @@ class McpResourceHandlersTest {
         run.store.add(req3)
 
         // Use handleResourceRead with no sort_by param to test default
-        val result = handlers.handleResourceRead("turbo://runs/current/summary")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/summary")
 
         val results = result["results"] as List<Map<String, Any?>>
         assertEquals(3, results.size)
@@ -297,7 +298,7 @@ class McpResourceHandlersTest {
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead("turbo://organizer")
+        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer")
 
         assertEquals(1, result["count"])
     }
@@ -334,7 +335,7 @@ class McpResourceHandlersTest {
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead("turbo://organizer/42")
+        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer/42")
 
         assertEquals(42, result["id"])
         assertEquals("GET /test HTTP/1.1", result["request"])

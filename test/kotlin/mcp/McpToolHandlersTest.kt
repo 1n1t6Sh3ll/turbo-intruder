@@ -8,6 +8,7 @@ class McpToolHandlersTest {
 
     private lateinit var manager: RunManager
     private lateinit var handlers: McpToolHandlers
+    private val testSessionId = "test-session"
 
     @BeforeEach
     fun setup() {
@@ -42,6 +43,7 @@ class McpToolHandlersTest {
     fun `startRun blocks until completion and returns results`() {
         // Use a script that completes immediately
         val result = handlers.startRun(
+            sessionId = testSessionId,
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -58,6 +60,7 @@ class McpToolHandlersTest {
     fun `startRun returns timeout status when timeout exceeded`() {
         // Use a script that would run forever (but we timeout quickly)
         val result = handlers.startRun(
+            sessionId = testSessionId,
             script = """
 def queueRequests(target, wordlists):
     import time
@@ -81,6 +84,7 @@ def completed(results):
         // This test verifies the default parameter exists
         // We don't actually wait 60 seconds - just verify the function accepts no timeout param
         val result = handlers.startRun(
+            sessionId = testSessionId,
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -94,6 +98,7 @@ def completed(results):
     @Test
     fun `startRunAsync returns immediately with started status`() {
         val result = handlers.startRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -108,6 +113,7 @@ def completed(results):
     @Test
     fun `startConcurrentRunAsync preserves existing runs`() {
         handlers.startRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -116,6 +122,7 @@ def completed(results):
         val firstRunId = manager.currentRun?.id
 
         val result = handlers.startConcurrentRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
@@ -130,23 +137,24 @@ def completed(results):
     @Test
     fun `stopRun stops current run`() {
         handlers.startRunAsync(
+            sessionId = testSessionId,
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
             endpoint = "https://example.com:443",
             baseInput = ""
         )
 
-        val result = handlers.stopRun(null)
+        val result = handlers.stopRun(testSessionId, null)
 
         assertEquals("stopped", result["status"])
     }
 
     @Test
     fun `deleteAllRuns returns count`() {
-        manager.startConcurrentRun()
-        manager.startConcurrentRun()
+        manager.startConcurrentRun(testSessionId)
+        manager.startConcurrentRun(testSessionId)
 
-        val result = handlers.deleteAllRuns()
+        val result = handlers.deleteAllRuns(testSessionId)
 
         assertEquals(2, result["deleted_count"])
     }
@@ -157,7 +165,7 @@ def completed(results):
         val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
 
         // Create a run with some requests
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val req1 = burp.Request("GET /page1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
         req1.response = "HTTP/1.1 200 OK\r\n\r\nOK"
@@ -168,6 +176,7 @@ def completed(results):
         run.store.add(req2)
 
         val result = handlersWithOrganizer.saveToOrganizer(
+            sessionId = testSessionId,
             runId = null,
             items = """[{"request_id": 1, "notes": "Interesting finding"}, {"request_id": 2, "notes": "Check this"}]"""
         )
@@ -184,13 +193,14 @@ def completed(results):
         val fakeOrganizer = FakeOrganizerProvider(emptyList())
         val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
 
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val req1 = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
         req1.response = "HTTP/1.1 200 OK\r\n\r\n"
         run.store.add(req1)
 
         val result = handlersWithOrganizer.saveToOrganizer(
+            sessionId = testSessionId,
             runId = null,
             items = """[{"request_id": 1, "notes": "Good"}, {"request_id": 999, "notes": "Missing"}]"""
         )
@@ -204,7 +214,7 @@ def completed(results):
 
     @Test
     fun `searchResponses returns matching request IDs`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val req1 = burp.Request("GET /page1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
         req1.response = "HTTP/1.1 200 OK\r\n\r\nHello World"
@@ -218,7 +228,7 @@ def completed(results):
         run.store.add(req2)
         run.store.add(req3)
 
-        val result = handlers.searchResponses(runId = null, query = "World")
+        val result = handlers.searchResponses(sessionId = testSessionId, runId = null, query = "World")
 
         val matches = result["matches"] as List<Int>
         assertEquals(listOf(1, 2), matches.sorted())
@@ -227,13 +237,13 @@ def completed(results):
 
     @Test
     fun `searchResponses returns empty list when no matches`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req.id = 1
         req.response = "HTTP/1.1 200 OK\r\n\r\nHello"
         run.store.add(req)
 
-        val result = handlers.searchResponses(runId = null, query = "notfound")
+        val result = handlers.searchResponses(sessionId = testSessionId, runId = null, query = "notfound")
 
         val matches = result["matches"] as List<Int>
         assertEquals(emptyList<Int>(), matches)
@@ -242,13 +252,13 @@ def completed(results):
 
     @Test
     fun `searchResponses handles null responses`() {
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
         val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req.id = 1
         req.response = null
         run.store.add(req)
 
-        val result = handlers.searchResponses(runId = null, query = "test")
+        val result = handlers.searchResponses(sessionId = testSessionId, runId = null, query = "test")
 
         val matches = result["matches"] as List<Int>
         assertEquals(emptyList<Int>(), matches)
@@ -256,19 +266,19 @@ def completed(results):
 
     @Test
     fun `searchResponses uses specified run`() {
-        val run1 = manager.startConcurrentRun()
+        val run1 = manager.startConcurrentRun(testSessionId)
         val req1 = burp.Request("GET /run1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
         req1.response = "HTTP/1.1 200 OK\r\n\r\nFindMe"
         run1.store.add(req1)
 
-        val run2 = manager.startConcurrentRun()
+        val run2 = manager.startConcurrentRun(testSessionId)
         val req2 = burp.Request("GET /run2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req2.id = 1
         req2.response = "HTTP/1.1 200 OK\r\n\r\nNotThis"
         run2.store.add(req2)
 
-        val result = handlers.searchResponses(runId = run1.id, query = "FindMe")
+        val result = handlers.searchResponses(sessionId = testSessionId, runId = run1.id, query = "FindMe")
 
         val matches = result["matches"] as List<Int>
         assertEquals(listOf(1), matches)
@@ -276,7 +286,7 @@ def completed(results):
 
     @Test
     fun `searchResponses returns error when no run found`() {
-        val result = handlers.searchResponses(runId = "nonexistent", query = "test")
+        val result = handlers.searchResponses(sessionId = testSessionId, runId = "nonexistent", query = "test")
 
         assertEquals("No run found", result["error"])
     }
@@ -287,19 +297,20 @@ def completed(results):
         val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
 
         // Create two runs
-        val run1 = manager.startConcurrentRun()
+        val run1 = manager.startConcurrentRun(testSessionId)
         val req1 = burp.Request("GET /run1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
         req1.response = "HTTP/1.1 200 OK\r\n\r\n"
         run1.store.add(req1)
 
-        val run2 = manager.startConcurrentRun()
+        val run2 = manager.startConcurrentRun(testSessionId)
         val req2 = burp.Request("GET /run2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req2.id = 1  // Same ID but different run
         req2.response = "HTTP/1.1 404 Not Found\r\n\r\n"
         run2.store.add(req2)
 
         val result = handlersWithOrganizer.saveToOrganizer(
+            sessionId = testSessionId,
             runId = run1.id,
             items = """[{"request_id": 1, "notes": "From run1"}]"""
         )
@@ -315,7 +326,7 @@ def completed(results):
         // Use the ResourceHandlers to test the result structure directly
         // since startRun() uses the same result mapping
         val resourceHandlers = McpResourceHandlers(manager)
-        val run = manager.startRun()
+        val run = manager.startRun(testSessionId)
 
         val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req.id = 1
@@ -323,7 +334,7 @@ def completed(results):
         req.anomalyRank = 42
         run.store.add(req)
 
-        val result = resourceHandlers.getResults(null, "id", true, 100, 0)
+        val result = resourceHandlers.getResults(testSessionId, null, "id", true, 100, 0)
         val results = result["results"] as List<Map<String, Any?>>
 
         assertEquals(1, results.size)

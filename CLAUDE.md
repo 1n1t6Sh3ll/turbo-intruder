@@ -21,3 +21,7 @@ Standalone listens on `localhost:31338`. Burp extension uses `localhost:31337`.
 ## Development
 
 Always use `superpowers:test-driven-development` when editing code.
+
+## Reference
+
+MCP Java SDK source is available at `mcp-guidance/java-sdk/` for API reference.

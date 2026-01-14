@@ -198,10 +198,11 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.startRun(
+                        sessionId = exchange.sessionId(),
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
@@ -245,10 +246,11 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.startRunAsync(
+                        sessionId = exchange.sessionId(),
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
@@ -291,10 +293,11 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.startConcurrentRunAsync(
+                        sessionId = exchange.sessionId(),
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
@@ -324,9 +327,9 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
-                    toolHandlers.stopRun(request.arguments()["run_id"] as? String)
+                    toolHandlers.stopRun(exchange.sessionId(), request.arguments()["run_id"] as? String)
                 }
             }
             .build()
@@ -351,9 +354,9 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
-                    toolHandlers.deleteRun(request.arguments()["run_id"] as? String)
+                    toolHandlers.deleteRun(exchange.sessionId(), request.arguments()["run_id"] as? String)
                 }
             }
             .build()
@@ -373,9 +376,9 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, _ ->
+            .callHandler { exchange, _ ->
                 executeToolWithErrorHandling {
-                    toolHandlers.deleteAllRuns()
+                    toolHandlers.deleteAllRuns(exchange.sessionId())
                 }
             }
             .build()
@@ -441,10 +444,11 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.saveToOrganizer(
+                        sessionId = exchange.sessionId(),
                         runId = args["run_id"] as? String,
                         items = args["items"] as? String ?: "[]"
                     )
@@ -539,10 +543,11 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { _, request ->
+            .callHandler { exchange, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.searchResponses(
+                        sessionId = exchange.sessionId(),
                         runId = args["run_id"] as? String,
                         query = args["query"] as? String ?: ""
                     )
@@ -573,8 +578,8 @@ class TurboMcpServer(
             .mimeType("application/json")
             .build()
 
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, _ ->
-            val result = resourceHandlers.listRuns()
+        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, _ ->
+            val result = resourceHandlers.listRuns(exchange.sessionId())
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     "turbo://runs",
@@ -593,9 +598,9 @@ class TurboMcpServer(
             .mimeType("application/json")
             .build()
 
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
             val runId = resourceHandlers.parseRunId(request.uri())
-            val result = resourceHandlers.getRunStatus(runId)
+            val result = resourceHandlers.getRunStatus(exchange.sessionId(), runId)
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     request.uri(),
@@ -614,11 +619,12 @@ class TurboMcpServer(
             .mimeType("application/json")
             .build()
 
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
             val uri = request.uri()
             val runId = resourceHandlers.parseRunId(uri)
             val params = resourceHandlers.parseQueryParams(uri)
             val result = resourceHandlers.getResults(
+                sessionId = exchange.sessionId(),
                 runId = runId,
                 sortBy = params["sort_by"] ?: "id",
                 descending = params["descending"] != "false",
@@ -643,12 +649,13 @@ class TurboMcpServer(
             .mimeType("application/json")
             .build()
 
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
             val uri = request.uri()
             val runId = resourceHandlers.parseRunId(uri)
             val requestId = resourceHandlers.parseRequestId(uri) ?: -1
             val params = resourceHandlers.parseQueryParams(uri)
             val result = resourceHandlers.getRequestDetail(
+                sessionId = exchange.sessionId(),
                 runId = runId,
                 requestId = requestId,
                 bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
@@ -672,8 +679,8 @@ class TurboMcpServer(
             .mimeType("application/json")
             .build()
 
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val result = resourceHandlers.handleResourceRead(request.uri())
+        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
+            val result = resourceHandlers.handleResourceRead(exchange.sessionId(), request.uri())
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     request.uri(),

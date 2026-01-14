@@ -93,4 +93,91 @@ class RunManagerTest {
         assertEquals(3, count)
         assertNull(manager.currentRun)
     }
+
+    // Session-scoped tests
+
+    @Test
+    fun `startRun with sessionId only clears that session's runs`() {
+        val sessionA = "session-a"
+        val sessionB = "session-b"
+
+        val runA = manager.startRun(sessionA)
+        val runB = manager.startRun(sessionB)
+
+        // Session A starts a new run - should not affect session B's run
+        val runA2 = manager.startRun(sessionA)
+
+        // Session B's run should still exist
+        assertNotNull(manager.getRun(sessionB, runB.id))
+        // Session A's old run should be gone
+        assertNull(manager.getRun(sessionA, runA.id))
+        // Session A's new run should be current
+        assertEquals(runA2.id, manager.getRun(sessionA, null)?.id)
+    }
+
+    @Test
+    fun `getAllRuns with sessionId returns only that session's runs`() {
+        val sessionA = "session-a"
+        val sessionB = "session-b"
+
+        manager.startConcurrentRun(sessionA)
+        manager.startConcurrentRun(sessionA)
+        manager.startConcurrentRun(sessionB)
+
+        assertEquals(2, manager.getAllRuns(sessionA).size)
+        assertEquals(1, manager.getAllRuns(sessionB).size)
+    }
+
+    @Test
+    fun `getRun with sessionId and null returns that session's current run`() {
+        val sessionA = "session-a"
+        val sessionB = "session-b"
+
+        val runA = manager.startRun(sessionA)
+        val runB = manager.startRun(sessionB)
+
+        assertEquals(runA.id, manager.getRun(sessionA, null)?.id)
+        assertEquals(runB.id, manager.getRun(sessionB, null)?.id)
+    }
+
+    @Test
+    fun `getRun with explicit id returns run regardless of session`() {
+        val sessionA = "session-a"
+        val sessionB = "session-b"
+
+        val runA = manager.startRun(sessionA)
+
+        // Session B can access session A's run by explicit ID
+        assertEquals(runA.id, manager.getRun(sessionB, runA.id)?.id)
+    }
+
+    @Test
+    fun `deleteAllRuns with sessionId only deletes that session's runs`() {
+        val sessionA = "session-a"
+        val sessionB = "session-b"
+
+        manager.startConcurrentRun(sessionA)
+        manager.startConcurrentRun(sessionA)
+        manager.startConcurrentRun(sessionB)
+
+        val count = manager.deleteAllRuns(sessionA)
+
+        assertEquals(2, count)
+        assertEquals(0, manager.getAllRuns(sessionA).size)
+        assertEquals(1, manager.getAllRuns(sessionB).size)
+    }
+
+    @Test
+    fun `deleteRun can delete any run regardless of session`() {
+        val sessionA = "session-a"
+        val sessionB = "session-b"
+
+        val runA = manager.startRun(sessionA)
+
+        // Session B can delete session A's run
+        val result = manager.deleteRun(sessionB, runA.id)
+
+        assertEquals("deleted", result)
+        assertNull(manager.getRun(sessionA, runA.id))
+    }
 }
