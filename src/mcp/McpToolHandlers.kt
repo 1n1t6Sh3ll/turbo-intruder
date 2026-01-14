@@ -55,6 +55,10 @@ class McpToolHandlers(
         val saved = mutableListOf<Int>()
         val errors = mutableListOf<Map<String, Any>>()
 
+        val scriptSection = if (run.handler.code.isNotBlank()) {
+            "\n\n--- Script ---\n${run.handler.code}"
+        } else ""
+
         for (item in itemList) {
             val requestId = item.get("request_id").asInt()
             val notes = item.get("notes").asText()
@@ -63,7 +67,7 @@ class McpToolHandlers(
                 errors.add(mapOf("request_id" to requestId, "error" to "Request not found"))
                 continue
             }
-            organizerProvider.sendToOrganizer(request, notes)
+            organizerProvider.sendToOrganizer(request, notes + scriptSection)
             saved.add(requestId)
         }
 

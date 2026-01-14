@@ -160,12 +160,13 @@ def completed(results):
     }
 
     @Test
-    fun `saveToOrganizer saves requests with notes`() {
+    fun `saveToOrganizer saves requests with notes and script`() {
         val fakeOrganizer = FakeOrganizerProvider(emptyList())
         val handlersWithOrganizer = McpToolHandlers(manager, fakeOrganizer)
 
         // Create a run with some requests
         val run = manager.startRun(testSessionId)
+        run.handler.code = "def queueRequests(target, wordlists):\n    pass"
         val req1 = burp.Request("GET /page1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
         req1.response = "HTTP/1.1 200 OK\r\n\r\nOK"
@@ -184,8 +185,11 @@ def completed(results):
         val saved = result["saved"] as List<*>
         assertEquals(listOf(1, 2), saved)
         assertEquals(2, fakeOrganizer.sentItems.size)
-        assertEquals("Interesting finding", fakeOrganizer.sentItems[0].second)
-        assertEquals("Check this", fakeOrganizer.sentItems[1].second)
+        assertTrue(fakeOrganizer.sentItems[0].second.startsWith("Interesting finding"))
+        assertTrue(fakeOrganizer.sentItems[0].second.contains("--- Script ---"))
+        assertTrue(fakeOrganizer.sentItems[0].second.contains("def queueRequests"))
+        assertTrue(fakeOrganizer.sentItems[1].second.startsWith("Check this"))
+        assertTrue(fakeOrganizer.sentItems[1].second.contains("--- Script ---"))
     }
 
     @Test
