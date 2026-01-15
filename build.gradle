@@ -59,6 +59,9 @@ dependencies {
     implementation 'org.eclipse.jetty.ee10:jetty-ee10-servlet:12.0.14'
     implementation 'org.eclipse.jetty:jetty-server:12.0.14'
 
+    // Logging for MCP debugging
+    implementation 'ch.qos.logback:logback-classic:1.5.6'
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.0'
     // testImplementation 'io.mockk:mockk:1.13.13'  // Add when needed
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
