@@ -2,8 +2,18 @@ package mcp
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import java.net.ServerSocket
 
 class TurboMcpServerTest {
+
+    private fun findFreePort(): Int {
+        return ServerSocket(0).use { it.localPort }
+    }
+
+    @Test
+    fun `stateless mode is enabled by default`() {
+        assertTrue(TurboMcpServer.STATELESS_MODE)
+    }
 
     @Test
     fun `server can be created with port`() {
@@ -38,5 +48,27 @@ class TurboMcpServerTest {
         assertFalse(toolNames.contains("start_concurrent_run"))
         assertTrue(toolNames.contains("stop_run"))
         assertTrue(toolNames.contains("set_organizer_notes"))
+    }
+
+    @Test
+    fun `server starts and stops with stateless transport`() {
+        assertTrue(TurboMcpServer.STATELESS_MODE, "Stateless mode should be enabled")
+
+        val port = findFreePort()
+        val server = TurboMcpServer(port = port)
+
+        // Should not throw
+        server.start()
+
+        // Server should be listening - verify by trying to start another server on same port
+        val conflictException = assertThrows(Exception::class.java) {
+            val server2 = TurboMcpServer(port = port)
+            server2.start()
+        }
+        assertTrue(conflictException.message?.contains("Address already in use") == true ||
+                   conflictException.cause?.message?.contains("Address already in use") == true,
+            "Port should be in use")
+
+        server.stop()
     }
 }
