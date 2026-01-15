@@ -80,27 +80,31 @@ class McpToolHandlers(
         baseRequest: String,
         endpoint: String,
         baseInput: String,
-        timeoutMs: Long = 60000
+        timeoutMs: Long = 60000,
+        normalizeLineEndings: Boolean = true
     ): Map<String, Any?> {
+        val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
         val run = manager.startRun(sessionId)
-        launchRun(run, script, baseRequest, endpoint, baseInput)
+        launchRun(run, normalized.script, baseRequest, endpoint, baseInput)
 
         // Wait for completion or timeout
         val startTime = System.currentTimeMillis()
         while (!run.handler.hasFinished()) {
             if (System.currentTimeMillis() - startTime > timeoutMs) {
-                return mapOf(
+                val result = mutableMapOf<String, Any?>(
                     "status" to "timeout",
                     "run_id" to run.id,
                     "result_count" to run.store.count()
                 )
+                normalized.warning?.let { result["warning"] = it }
+                return result
             }
             Thread.sleep(50)
         }
 
         // Get results sorted by anomaly rank descending
         val results = run.store.getResults(burp.SortField.ANOMALY_RANK, true, 100, 0)
-        return mapOf(
+        val result = mutableMapOf<String, Any?>(
             "status" to "completed",
             "run_id" to run.id,
             "result_count" to run.store.count(),
@@ -117,6 +121,8 @@ class McpToolHandlers(
                 )
             }
         )
+        normalized.warning?.let { result["warning"] = it }
+        return result
     }
 
     fun startRunAsync(
@@ -124,11 +130,15 @@ class McpToolHandlers(
         script: String,
         baseRequest: String,
         endpoint: String,
-        baseInput: String
+        baseInput: String,
+        normalizeLineEndings: Boolean = true
     ): Map<String, Any?> {
+        val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
         val run = manager.startRun(sessionId)
-        launchRun(run, script, baseRequest, endpoint, baseInput)
-        return mapOf("status" to "started", "run_id" to run.id)
+        launchRun(run, normalized.script, baseRequest, endpoint, baseInput)
+        val result = mutableMapOf<String, Any?>("status" to "started", "run_id" to run.id)
+        normalized.warning?.let { result["warning"] = it }
+        return result
     }
 
     fun startConcurrentRunAsync(
@@ -136,14 +146,18 @@ class McpToolHandlers(
         script: String,
         baseRequest: String,
         endpoint: String,
-        baseInput: String
+        baseInput: String,
+        normalizeLineEndings: Boolean = true
     ): Map<String, Any?> {
+        val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
         val run = manager.startConcurrentRun(sessionId)
-        launchRun(run, script, baseRequest, endpoint, baseInput)
-        return mapOf(
+        launchRun(run, normalized.script, baseRequest, endpoint, baseInput)
+        val result = mutableMapOf<String, Any?>(
             "status" to "started",
             "run_id" to run.id
         )
+        normalized.warning?.let { result["warning"] = it }
+        return result
     }
 
     fun stopRun(sessionId: String, runId: String?): Map<String, String> {

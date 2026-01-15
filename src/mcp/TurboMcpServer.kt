@@ -227,7 +227,8 @@ class TurboMcpServer(
                     "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
                     "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
                     "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
-                    "timeout_ms": { "type": "integer", "description": "Timeout in milliseconds (default: 60000). If exceeded, returns run_id for manual polling." }
+                    "timeout_ms": { "type": "integer", "description": "Timeout in milliseconds (default: 60000). If exceeded, returns run_id for manual polling." },
+                    "normalize_line_endings": { "type": "boolean", "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true" }
                 },
                 "required": ["script", "base_request", "endpoint"]
             }
@@ -243,7 +244,8 @@ class TurboMcpServer(
                     baseRequest = args["base_request"] as? String ?: "",
                     endpoint = args["endpoint"] as? String ?: "",
                     baseInput = args["base_input"] as? String ?: "",
-                    timeoutMs = (args["timeout_ms"] as? Number)?.toLong() ?: 60000
+                    timeoutMs = (args["timeout_ms"] as? Number)?.toLong() ?: 60000,
+                    normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
                 )
             }
         }
@@ -260,7 +262,8 @@ class TurboMcpServer(
                     "script": { "type": "string", "description": "Python script code that controls the attack" },
                     "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
                     "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
-                    "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" }
+                    "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
+                    "normalize_line_endings": { "type": "boolean", "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true" }
                 },
                 "required": ["script", "base_request", "endpoint"]
             }
@@ -275,7 +278,8 @@ class TurboMcpServer(
                     script = args["script"] as? String ?: "",
                     baseRequest = args["base_request"] as? String ?: "",
                     endpoint = args["endpoint"] as? String ?: "",
-                    baseInput = args["base_input"] as? String ?: ""
+                    baseInput = args["base_input"] as? String ?: "",
+                    normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
                 )
             }
         }
@@ -292,7 +296,8 @@ class TurboMcpServer(
                     "script": { "type": "string", "description": "Python script code that controls the attack" },
                     "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
                     "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
-                    "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" }
+                    "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
+                    "normalize_line_endings": { "type": "boolean", "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true" }
                 },
                 "required": ["script", "base_request", "endpoint"]
             }
@@ -307,7 +312,8 @@ class TurboMcpServer(
                     script = args["script"] as? String ?: "",
                     baseRequest = args["base_request"] as? String ?: "",
                     endpoint = args["endpoint"] as? String ?: "",
-                    baseInput = args["base_input"] as? String ?: ""
+                    baseInput = args["base_input"] as? String ?: "",
+                    normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
                 )
             }
         }
@@ -540,6 +546,10 @@ class TurboMcpServer(
                     "timeout_ms": {
                         "type": "integer",
                         "description": "Timeout in milliseconds (default: 60000). If exceeded, returns run_id for manual polling."
+                    },
+                    "normalize_line_endings": {
+                        "type": "boolean",
+                        "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true"
                     }
                 },
                 "required": ["script", "base_request", "endpoint"]
@@ -558,7 +568,8 @@ class TurboMcpServer(
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
                         baseInput = args["base_input"] as? String ?: "",
-                        timeoutMs = (args["timeout_ms"] as? Number)?.toLong() ?: 60000
+                        timeoutMs = (args["timeout_ms"] as? Number)?.toLong() ?: 60000,
+                        normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
                     )
                 }
             }
@@ -588,6 +599,10 @@ class TurboMcpServer(
                     "base_input": {
                         "type": "string",
                         "description": "Input data to feed into the script (e.g., wordlist content)"
+                    },
+                    "normalize_line_endings": {
+                        "type": "boolean",
+                        "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true"
                     }
                 },
                 "required": ["script", "base_request", "endpoint"]
@@ -605,7 +620,8 @@ class TurboMcpServer(
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
-                        baseInput = args["base_input"] as? String ?: ""
+                        baseInput = args["base_input"] as? String ?: "",
+                        normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
                     )
                 }
             }
@@ -635,6 +651,10 @@ class TurboMcpServer(
                     "base_input": {
                         "type": "string",
                         "description": "Input data to feed into the script (e.g., wordlist content)"
+                    },
+                    "normalize_line_endings": {
+                        "type": "boolean",
+                        "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true"
                     }
                 },
                 "required": ["script", "base_request", "endpoint"]
@@ -652,7 +672,8 @@ class TurboMcpServer(
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
-                        baseInput = args["base_input"] as? String ?: ""
+                        baseInput = args["base_input"] as? String ?: "",
+                        normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
                     )
                 }
             }
