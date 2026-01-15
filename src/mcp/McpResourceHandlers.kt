@@ -233,7 +233,7 @@ class McpResourceHandlers(
     }
 
     fun parseRequestId(uri: String): Int? {
-        val match = Regex("turbo://runs/[^/]+/requests/(\\d+)").find(uri)
+        val match = Regex("turbo://runs/[^/]+/results/(\\d+)").find(uri)
         return match?.groupValues?.get(1)?.toIntOrNull()
     }
 
@@ -273,8 +273,8 @@ class McpResourceHandlers(
                 val topic = parseDocTopic(uri) ?: return mapOf("error" to "invalid_topic")
                 getDoc(topic)
             }
-            uri.matches(Regex("turbo://requests/\\d+.*")) -> {
-                val requestId = Regex("turbo://requests/(\\d+)").find(uri)?.groupValues?.get(1)?.toIntOrNull()
+            uri.matches(Regex("turbo://results/\\d+.*")) -> {
+                val requestId = Regex("turbo://results/(\\d+)").find(uri)?.groupValues?.get(1)?.toIntOrNull()
                     ?: return mapOf("error" to "invalid_request_id")
                 val params = parseQueryParams(uri)
                 getRequestDetail(
@@ -285,7 +285,7 @@ class McpResourceHandlers(
                     exportFile = params["export"] == "file"
                 )
             }
-            uri.matches(Regex("turbo://runs/[^/]+/requests/\\d+.*")) -> {
+            uri.matches(Regex("turbo://runs/[^/]+/results/\\d+.*")) -> {
                 val runId = parseRunId(uri)
                 val requestId = parseRequestId(uri) ?: return mapOf("error" to "invalid_request_id")
                 val params = parseQueryParams(uri)

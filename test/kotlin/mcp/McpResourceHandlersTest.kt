@@ -82,7 +82,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `parseUri extracts request_id correctly`() {
-        assertEquals(42, handlers.parseRequestId("turbo://runs/abc123/requests/42"))
+        assertEquals(42, handlers.parseRequestId("turbo://runs/abc123/results/42"))
         assertNull(handlers.parseRequestId("turbo://runs/abc123/summary"))
     }
 
@@ -179,7 +179,7 @@ class McpResourceHandlersTest {
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "Z".repeat(500)
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/requests/1?body_limit=50")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/results/1?body_limit=50")
 
         assertEquals("Z".repeat(50), result["response_body"])
     }
@@ -192,7 +192,7 @@ class McpResourceHandlersTest {
         request.response = "HTTP/1.1 200 OK\r\n\r\ndata"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/requests/1?export=file")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/results/1?export=file")
 
         assertNotNull(result["response_file"])
         assertNull(result["response_body"])
@@ -222,7 +222,7 @@ class McpResourceHandlersTest {
         request.response = "HTTP/1.1 200 OK\r\n\r\ntest body"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://requests/36")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://results/36")
 
         assertEquals("test body", result["response_body"])
         assertEquals(200, result["status"])

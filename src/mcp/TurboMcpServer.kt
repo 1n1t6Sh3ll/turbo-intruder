@@ -643,9 +643,9 @@ class TurboMcpServer(
 
     private fun buildRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/requests/{id}")
-            .name("Details of a specific request")
-            .description("Get request and response details. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
+            .uri("turbo://runs/{run_id}/results/{id}")
+            .name("Details of a specific result")
+            .description("Get request and response details for a result. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
             .mimeType("application/json")
             .build()
 
@@ -673,9 +673,9 @@ class TurboMcpServer(
 
     private fun buildShorthandRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
-            .uri("turbo://requests/{id}")
-            .name("Details of a specific request (shorthand)")
-            .description("Shorthand for turbo://runs/current/requests/{id}. Get request and response details from the current run.")
+            .uri("turbo://results/{id}")
+            .name("Details of a specific result (shorthand)")
+            .description("Shorthand for turbo://runs/current/results/{id}. Get request and response details from the current run.")
             .mimeType("application/json")
             .build()
 
