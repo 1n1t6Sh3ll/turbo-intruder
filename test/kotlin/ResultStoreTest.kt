@@ -197,4 +197,28 @@ class ResultStoreTest {
         assertEquals(4L, results[1].time)
         assertEquals(5L, results[2].time)
     }
+
+    @Test
+    fun `getUniqueStatusCodes returns all distinct status codes`() {
+        val req200a = Request("GET /a HTTP/1.1").apply { response = "HTTP/1.1 200 OK\r\n\r\n" }
+        val req200b = Request("GET /b HTTP/1.1").apply { response = "HTTP/1.1 200 OK\r\n\r\n" }
+        val req404 = Request("GET /c HTTP/1.1").apply { response = "HTTP/1.1 404 Not Found\r\n\r\n" }
+        val req500 = Request("GET /d HTTP/1.1").apply { response = "HTTP/1.1 500 Error\r\n\r\n" }
+
+        store.add(req200a)
+        store.add(req200b)
+        store.add(req404)
+        store.add(req500)
+
+        val statusCodes = store.getUniqueStatusCodes()
+
+        assertEquals(setOf(200, 404, 500), statusCodes)
+    }
+
+    @Test
+    fun `getUniqueStatusCodes returns empty set for empty store`() {
+        val statusCodes = store.getUniqueStatusCodes()
+
+        assertEquals(emptySet<Int>(), statusCodes)
+    }
 }

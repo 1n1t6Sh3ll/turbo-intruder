@@ -486,4 +486,36 @@ class McpResourceHandlersTest {
         assertEquals("Q".repeat(150), result["response_body"])
         assertEquals(true, result["response_body_truncated"])
     }
+
+    @Test
+    fun `getResults includes status_codes field with all unique status codes`() {
+        val run = manager.startRun(testSessionId)
+
+        val req200a = burp.Request("GET /a HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req200a.id = 1
+        req200a.response = "HTTP/1.1 200 OK\r\n\r\nok"
+
+        val req200b = burp.Request("GET /b HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req200b.id = 2
+        req200b.response = "HTTP/1.1 200 OK\r\n\r\nok"
+
+        val req404 = burp.Request("GET /c HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req404.id = 3
+        req404.response = "HTTP/1.1 404 Not Found\r\n\r\nnot found"
+
+        val req500 = burp.Request("GET /d HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req500.id = 4
+        req500.response = "HTTP/1.1 500 Error\r\n\r\nerror"
+
+        run.store.add(req200a)
+        run.store.add(req200b)
+        run.store.add(req404)
+        run.store.add(req500)
+
+        val result = handlers.getResults(testSessionId, null, "id", true, 100, 0)
+
+        @Suppress("UNCHECKED_CAST")
+        val statusCodes = result["status_codes"] as Set<Int>
+        assertEquals(setOf(200, 404, 500), statusCodes)
+    }
 }

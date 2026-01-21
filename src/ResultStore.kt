@@ -55,4 +55,8 @@ class ResultStore : OutputHandler {
 
         return sorted.drop(offset).take(limit)
     }
+
+    fun getUniqueStatusCodes(): Set<Int> {
+        return results.map { it.code }.toSet()
+    }
 }

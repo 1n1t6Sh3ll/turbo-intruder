@@ -78,7 +78,8 @@ class McpResourceHandlers(
                     "anomaly_rank" to req.anomalyRank
                 )
             },
-            "total_count" to run.store.count()
+            "total_count" to run.store.count(),
+            "status_codes" to run.store.getUniqueStatusCodes()
         )
     }
 
@@ -307,7 +308,7 @@ class McpResourceHandlers(
                     runId = runId,
                     sortBy = params["sort_by"] ?: "anomaly_rank",
                     descending = params["descending"] != "false",
-                    limit = params["limit"]?.toIntOrNull() ?: 100,
+                    limit = params["limit"]?.toIntOrNull() ?: 20,
                     offset = params["offset"]?.toIntOrNull() ?: 0
                 )
             }
