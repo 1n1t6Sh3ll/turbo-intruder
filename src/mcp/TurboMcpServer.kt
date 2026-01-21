@@ -1095,8 +1095,10 @@ class TurboMcpServer(
 
         return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
             val organizerId = resourceHandlers.parseOrganizerId(request.uri())
+            val params = resourceHandlers.parseQueryParams(request.uri())
+            val bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
             val result = if (organizerId != null) {
-                resourceHandlers.getOrganizerItem(organizerId)
+                resourceHandlers.getOrganizerItem(organizerId, bodyLimit)
             } else {
                 mapOf("error" to "invalid_organizer_id")
             }
@@ -1328,8 +1330,10 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
             val organizerId = resourceHandlers.parseOrganizerId(request.uri())
+            val params = resourceHandlers.parseQueryParams(request.uri())
+            val bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
             val result = if (organizerId != null) {
-                resourceHandlers.getOrganizerItem(organizerId)
+                resourceHandlers.getOrganizerItem(organizerId, bodyLimit)
             } else {
                 mapOf("error" to "invalid_organizer_id")
             }
