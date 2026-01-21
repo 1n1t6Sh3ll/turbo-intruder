@@ -137,6 +137,34 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `getRequestDetail includes truncation metadata when truncated`() {
+        val run = manager.startRun(testSessionId)
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\n\r\n" + "A".repeat(500)
+        run.store.add(request)
+
+        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
+
+        assertEquals(true, result["response_body_truncated"])
+        assertEquals(500, result["response_body_total_length"])
+    }
+
+    @Test
+    fun `getRequestDetail truncation metadata shows false when not truncated`() {
+        val run = manager.startRun(testSessionId)
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\n\r\nshort"
+        run.store.add(request)
+
+        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
+
+        assertEquals(false, result["response_body_truncated"])
+        assertEquals(5, result["response_body_total_length"])
+    }
+
+    @Test
     fun `getRequestDetail with exportFile writes response to file and returns path`() {
         val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")

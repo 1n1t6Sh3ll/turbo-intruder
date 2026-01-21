@@ -115,21 +115,16 @@ class McpResourceHandlers(
 
         val response = request.response
         val (headers, body) = splitResponse(response)
-        val truncatedBody = if (bodyLimit > 0 && body.length > bodyLimit) {
-            body.take(bodyLimit)
-        } else {
-            body
-        }
+        val truncatedBody = TruncatedHttpBody(body, bodyLimit)
 
         return mapOf(
             "request" to request.getRequest(),
             "response_headers" to headers,
-            "response_body" to truncatedBody,
             "status" to request.code,
             "length" to request.length,
             "time" to request.time,
             "words" to request.words
-        )
+        ) + truncatedBody.toResponseFields()
     }
 
     private fun splitResponse(response: String?): Pair<String, String> {
