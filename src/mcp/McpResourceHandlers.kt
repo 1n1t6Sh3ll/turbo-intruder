@@ -262,9 +262,13 @@ class McpResourceHandlers(
         return when {
             uri == "turbo://runs" -> listRuns(sessionId)
             uri == "turbo://organizer" -> listOrganizerItems()
-            uri.matches(Regex("turbo://organizer/\\d+")) -> {
+            uri.matches(Regex("turbo://organizer/\\d+.*")) -> {
                 val organizerId = parseOrganizerId(uri) ?: return mapOf("error" to "invalid_organizer_id")
-                getOrganizerItem(organizerId)
+                val params = parseQueryParams(uri)
+                getOrganizerItem(
+                    id = organizerId,
+                    bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
+                )
             }
             uri == "turbo://docs" -> listDocs()
             uri.matches(Regex("turbo://docs/[^/]+")) -> {

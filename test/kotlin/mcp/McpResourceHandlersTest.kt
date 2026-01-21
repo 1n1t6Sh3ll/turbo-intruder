@@ -469,4 +469,21 @@ class McpResourceHandlersTest {
         assertEquals("Z".repeat(500), result["response_body"])
         assertEquals(false, result["response_body_truncated"])
     }
+
+    @Test
+    fun `handleResourceRead parses body_limit for organizer items`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 42,
+                request = "GET /test HTTP/1.1",
+                response = "HTTP/1.1 200 OK\r\n\r\n" + "Q".repeat(500)
+            )
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer/42?body_limit=150")
+
+        assertEquals("Q".repeat(150), result["response_body"])
+        assertEquals(true, result["response_body_truncated"])
+    }
 }
