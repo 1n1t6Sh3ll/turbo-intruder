@@ -171,6 +171,27 @@ class McpResourceHandlers(
         ) + truncatedBody.toResponseFields()
     }
 
+    fun getOrganizerItems(ids: Set<Int>, bodyLimit: Int = 100): Map<String, Any?> {
+        val items = organizerProvider?.getItemsByIds(ids) ?: emptyList()
+
+        return mapOf(
+            "items" to items.map { item ->
+                val (headers, body) = splitResponse(item.response)
+                val truncatedBody = TruncatedHttpBody(body, bodyLimit)
+
+                mapOf(
+                    "id" to item.id,
+                    "request" to item.request,
+                    "response_headers" to headers,
+                    "notes" to item.notes,
+                    "host" to item.host,
+                    "port" to item.port,
+                    "secure" to item.secure
+                ) + truncatedBody.toResponseFields()
+            }
+        )
+    }
+
     // Documentation resources
 
     fun listDocs(): Map<String, Any> {
@@ -259,17 +280,29 @@ class McpResourceHandlers(
         return match?.groupValues?.get(1)?.toIntOrNull()
     }
 
+    fun parseOrganizerIds(uri: String): Set<Int> {
+        val match = Regex("turbo://organizer/([\\d,]+)").find(uri)
+            ?: return emptySet()
+        return match.groupValues[1]
+            .split(',')
+            .mapNotNull { it.toIntOrNull() }
+            .toSet()
+    }
+
     fun handleResourceRead(sessionId: String, uri: String): Map<String, Any?> {
         return when {
             uri == "turbo://runs" -> listRuns(sessionId)
             uri == "turbo://organizer" -> listOrganizerItems()
-            uri.matches(Regex("turbo://organizer/\\d+.*")) -> {
-                val organizerId = parseOrganizerId(uri) ?: return mapOf("error" to "invalid_organizer_id")
+            uri.matches(Regex("turbo://organizer/[\\d,]+.*")) -> {
+                val ids = parseOrganizerIds(uri)
+                if (ids.isEmpty()) return mapOf("error" to "invalid_organizer_id")
                 val params = parseQueryParams(uri)
-                getOrganizerItem(
-                    id = organizerId,
-                    bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
-                )
+                val bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
+                if (ids.size == 1) {
+                    getOrganizerItem(id = ids.first(), bodyLimit = bodyLimit)
+                } else {
+                    getOrganizerItems(ids = ids, bodyLimit = bodyLimit)
+                }
             }
             uri == "turbo://docs" -> listDocs()
             uri.matches(Regex("turbo://docs/[^/]+")) -> {

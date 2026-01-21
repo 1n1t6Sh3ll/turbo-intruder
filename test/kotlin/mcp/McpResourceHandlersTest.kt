@@ -379,6 +379,15 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `parseOrganizerIds extracts comma-separated ids from URI`() {
+        assertEquals(setOf(1, 2, 3), handlers.parseOrganizerIds("turbo://organizer/1,2,3"))
+        assertEquals(setOf(42), handlers.parseOrganizerIds("turbo://organizer/42"))
+        assertEquals(setOf(10, 20), handlers.parseOrganizerIds("turbo://organizer/10,20?body_limit=100"))
+        assertEquals(emptySet<Int>(), handlers.parseOrganizerIds("turbo://organizer"))
+        assertEquals(emptySet<Int>(), handlers.parseOrganizerIds("turbo://organizer/"))
+    }
+
+    @Test
     fun `getOrganizerItem returns http service info`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(
@@ -517,5 +526,52 @@ class McpResourceHandlersTest {
         @Suppress("UNCHECKED_CAST")
         val statusCodes = result["status_codes"] as Set<Int>
         assertEquals(setOf(200, 404, 500), statusCodes)
+    }
+
+    @Test
+    fun `getOrganizerItems returns multiple items by ids`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nbody1"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nbody2"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nbody3")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItems(setOf(1, 3))
+
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(2, items.size)
+        assertEquals(setOf(1, 3), items.map { it["id"] }.toSet())
+    }
+
+    @Test
+    fun `getOrganizerItems respects body_limit`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\n" + "X".repeat(500))
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItems(setOf(1), bodyLimit = 50)
+
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals("X".repeat(50), items[0]["response_body"])
+        assertEquals(true, items[0]["response_body_truncated"])
+    }
+
+    @Test
+    fun `handleResourceRead routes comma-separated organizer ids`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(10, "GET /10 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nten"),
+            FakeOrganizerItem(20, "GET /20 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\ntwenty")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer/10,20")
+
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(2, items.size)
     }
 }
