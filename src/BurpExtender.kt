@@ -50,7 +50,8 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
 
         mcpServer = mcp.TurboMcpServer(
             port = 31337,
-            collaboratorProvider = mcp.BurpCollaboratorProvider()
+            collaboratorProvider = mcp.BurpCollaboratorProvider(),
+            desyncMode = { Utilities.globalSettings?.getBoolean("desync-agent-mode") == true }
         )
         mcpServer?.start()
         Utils.out("MCP server listening on http://localhost:31337")

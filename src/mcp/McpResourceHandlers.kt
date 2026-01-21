@@ -6,7 +6,8 @@ import kotlin.io.path.createTempDirectory
 
 class McpResourceHandlers(
     private val manager: RunManager,
-    private val organizerProvider: OrganizerProvider? = null
+    private val organizerProvider: OrganizerProvider? = null,
+    private val desyncMode: () -> Boolean = { false }
 ) {
 
     private val docTopics = mapOf(
@@ -120,7 +121,7 @@ class McpResourceHandlers(
 
         return mapOf(
             "request" to request.getRequest(),
-            "response_headers" to headers,
+            "response_headers" to filterHeaders(headers),
             "status" to request.code,
             "length" to request.length,
             "time" to request.time,
@@ -140,6 +141,13 @@ class McpResourceHandlers(
         } else {
             Pair(response, "")
         }
+    }
+
+    private fun filterHeaders(headers: String): String {
+        if (!desyncMode()) return headers
+        return headers.split("\r\n")
+            .filterNot { it.startsWith("Connection:", ignoreCase = true) }
+            .joinToString("\r\n")
     }
 
     // Organizer resources
@@ -163,7 +171,7 @@ class McpResourceHandlers(
         return mapOf(
             "id" to item.id,
             "request" to item.request,
-            "response_headers" to headers,
+            "response_headers" to filterHeaders(headers),
             "notes" to item.notes,
             "host" to item.host,
             "port" to item.port,
@@ -182,7 +190,7 @@ class McpResourceHandlers(
                 mapOf(
                     "id" to item.id,
                     "request" to item.request,
-                    "response_headers" to headers,
+                    "response_headers" to filterHeaders(headers),
                     "notes" to item.notes,
                     "host" to item.host,
                     "port" to item.port,

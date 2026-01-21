@@ -44,7 +44,8 @@ class TurboMcpServer(
     private val port: Int = 31338,
     private val disabledTools: Set<String> = emptySet(),
     private val collaboratorProvider: CollaboratorProvider? = null,
-    private val organizerProvider: OrganizerProvider = BurpOrganizerProvider()
+    private val organizerProvider: OrganizerProvider = BurpOrganizerProvider(),
+    private val desyncMode: () -> Boolean = { false }
 ) {
     companion object {
         const val STATELESS_MODE = true
@@ -53,7 +54,7 @@ class TurboMcpServer(
 
     private val manager = RunManager()
     val toolHandlers = McpToolHandlers(manager, organizerProvider, collaboratorProvider)
-    val resourceHandlers = McpResourceHandlers(manager, organizerProvider)
+    val resourceHandlers = McpResourceHandlers(manager, organizerProvider, desyncMode)
 
     private var server: McpSyncServer? = null
     private var statelessServer: io.modelcontextprotocol.server.McpStatelessSyncServer? = null

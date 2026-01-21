@@ -574,4 +574,60 @@ class McpResourceHandlersTest {
         val items = result["items"] as List<Map<String, Any?>>
         assertEquals(2, items.size)
     }
+
+    // Desync mode Connection header stripping tests
+
+    @Test
+    fun `getRequestDetail strips Connection header when desync mode enabled`() {
+        val handlersWithDesync = McpResourceHandlers(manager, desyncMode = { true })
+        val run = manager.startRun(testSessionId)
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html\r\n\r\nbody"
+        run.store.add(request)
+
+        val result = handlersWithDesync.getRequestDetail(testSessionId, null, 1)
+
+        assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
+    }
+
+    @Test
+    fun `getRequestDetail preserves Connection header when desync mode disabled`() {
+        val handlersNoDesync = McpResourceHandlers(manager, desyncMode = { false })
+        val run = manager.startRun(testSessionId)
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html\r\n\r\nbody"
+        run.store.add(request)
+
+        val result = handlersNoDesync.getRequestDetail(testSessionId, null, 1)
+
+        assertEquals("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html", result["response_headers"])
+    }
+
+    @Test
+    fun `getRequestDetail strips Connection header case-insensitively`() {
+        val handlersWithDesync = McpResourceHandlers(manager, desyncMode = { true })
+        val run = manager.startRun(testSessionId)
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\nconnection: close\r\nContent-Type: text/html\r\n\r\nbody"
+        run.store.add(request)
+
+        val result = handlersWithDesync.getRequestDetail(testSessionId, null, 1)
+
+        assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
+    }
+
+    @Test
+    fun `getOrganizerItem strips Connection header when desync mode enabled`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK\r\nConnection: close\r\nX-Custom: value\r\n\r\nbody")
+        ))
+        val handlersWithDesync = McpResourceHandlers(manager, fakeOrganizer, desyncMode = { true })
+
+        val result = handlersWithDesync.getOrganizerItem(1)
+
+        assertEquals("HTTP/1.1 200 OK\r\nX-Custom: value", result["response_headers"])
+    }
 }
