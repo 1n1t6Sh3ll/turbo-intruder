@@ -5,11 +5,14 @@ class RunHandler (){
     private var running = false
     private var engine: RequestEngine? = null
     private var statusOverride: String? = null
+    private var errorFlag: Boolean = false
     @Volatile private var scriptCompleted = false
     var msg: String = ""
     var code: String = ""
     var baseRequest: String = ""
     var rawRequest: ByteArray = "".toByteArray()
+
+    fun hasError(): Boolean = errorFlag
 
     fun isRunning(): Boolean {
         return running
@@ -49,8 +52,9 @@ class RunHandler (){
         return "Engine warming up..."
     }
 
-    fun overrideStatus(msg: String) {
+    fun overrideStatus(msg: String, isError: Boolean = true) {
         statusOverride = msg
+        errorFlag = isError
     }
 
     fun setMessage(msg: String) {

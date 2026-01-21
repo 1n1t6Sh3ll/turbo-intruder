@@ -77,6 +77,7 @@ fun evalJython(code: String, baseRequest: String, rawRequest: ByteArray, endpoin
         pyInterp.set("requestTable", requestTable)
         pyInterp.set("requests", reqs)
         pyInterp.set("host", host)
+        pyInterp.set("desyncAgentMode", Utilities.globalSettings?.getBoolean("desync-agent-mode") == true)
         if (Utils.gotBurp) {
             pyInterp.set("callbacks", Utils.callbacks)
             pyInterp.set("helpers", Utils.callbacks.helpers)

@@ -105,4 +105,23 @@ class RunHandlerTest {
 
         assertTrue(status.contains("processing"))
     }
+
+    @Test
+    fun `hasError returns false initially`() {
+        assertFalse(handler.hasError())
+    }
+
+    @Test
+    fun `hasError returns true after overrideStatus called`() {
+        handler.overrideStatus("User Python error: something failed")
+
+        assertTrue(handler.hasError())
+    }
+
+    @Test
+    fun `hasError returns false when overrideStatus called with isError false`() {
+        handler.overrideStatus("Non-error status", isError = false)
+
+        assertFalse(handler.hasError())
+    }
 }

@@ -24,6 +24,11 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
     var domains = HashSet<String>()
 
     init {
+        val desyncMode = Utilities.globalSettings?.getBoolean("desync-agent-mode")
+        Utils.out("desync-agent-mode = $desyncMode, requestsPerConnection = $requestsPerConnection")
+        if (desyncMode == true && requestsPerConnection > 1) {
+            throw IllegalArgumentException("desync-agent-mode is enabled: requestsPerConnection must be 1 to prevent false-positives (currently set to $requestsPerConnection)")
+        }
 
         internalSettings.put("ignoreLength", false)
 

@@ -43,6 +43,7 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
 
         Utils.utilities = Utilities(callbacks, HashMap(), "Turbo Intruder")
         Utilities.globalSettings.registerSetting("learn observed words", false);
+        Utilities.globalSettings.registerSetting("desync-agent-mode", false);
 
         SwingUtilities.invokeLater(ConfigMenu())
         SwingUtilities.invokeLater { addRunScriptToExistingMenu() }

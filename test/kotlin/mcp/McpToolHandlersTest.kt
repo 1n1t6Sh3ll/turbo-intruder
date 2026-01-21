@@ -345,6 +345,40 @@ def completed(results):
         assertTrue(results[0].containsKey("anomaly_rank"))
         assertEquals(42, results[0]["anomaly_rank"])
     }
+
+    @Test
+    fun `startRun returns failed status when script throws error`() {
+        val result = handlers.startRun(
+            sessionId = testSessionId,
+            script = """
+def queueRequests(target, wordlists):
+    raise Exception("Test error message")
+
+def completed(results):
+    pass
+            """.trimIndent(),
+            baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+            endpoint = "https://example.com:443",
+            baseInput = ""
+        )
+
+        assertEquals("failed", result["status"])
+        assertTrue((result["error_message"] as String).contains("Test error message"))
+    }
+
+    @Test
+    fun `startRun does not include error_message on success`() {
+        val result = handlers.startRun(
+            sessionId = testSessionId,
+            script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",
+            endpoint = "https://example.com:443",
+            baseInput = ""
+        )
+
+        assertEquals("completed", result["status"])
+        assertFalse(result.containsKey("error_message"))
+    }
 }
 
 // Test helpers

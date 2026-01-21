@@ -103,9 +103,10 @@ class McpToolHandlers(
         }
 
         // Get results sorted by anomaly rank descending
+        val failed = run.handler.hasError()
         val results = run.store.getResults(burp.SortField.ANOMALY_RANK, true, 100, 0)
         val result = mutableMapOf<String, Any?>(
-            "status" to "completed",
+            "status" to if (failed) "failed" else "completed",
             "run_id" to run.id,
             "result_count" to run.store.count(),
             "results" to results.map { req ->
@@ -121,6 +122,9 @@ class McpToolHandlers(
                 )
             }
         )
+        if (failed) {
+            result["error_message"] = run.handler.statusString()
+        }
         normalized.warning?.let { result["warning"] = it }
         return result
     }

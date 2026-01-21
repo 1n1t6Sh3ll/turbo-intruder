@@ -264,9 +264,13 @@ class Engine:
 
 class RequestEngine:
 
-    def __init__(self, endpoint, callback=None, engine=Engine.THREADED, concurrentConnections=50, requestsPerConnection=100, pipeline=False, maxQueueSize=100, timeout=10, maxRetriesPerRequest=3, idleTimeout=0, readCallback=None, readSize=1024, resumeSSL=True, autoStart=True, explodeOnEarlyRead=False, warmLocalConnection=True, fatPacket=False):
+    def __init__(self, endpoint, callback=None, engine=None, concurrentConnections=50, requestsPerConnection=100, pipeline=False, maxQueueSize=100, timeout=10, maxRetriesPerRequest=3, idleTimeout=0, readCallback=None, readSize=1024, resumeSSL=True, autoStart=True, explodeOnEarlyRead=False, warmLocalConnection=True, fatPacket=False):
         concurrentConnections = int(concurrentConnections)
         requestsPerConnection = int(requestsPerConnection)
+
+        # Default engine based on desync-agent-mode setting
+        if engine is None:
+            engine = Engine.BURP if desyncAgentMode else Engine.THREADED
 
         if not callback:
             callback = handleResponse
