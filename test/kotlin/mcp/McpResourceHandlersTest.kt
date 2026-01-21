@@ -334,7 +334,7 @@ class McpResourceHandlersTest {
     @Test
     fun `getOrganizerItem returns item by id`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
-            FakeOrganizerItem(100, "GET /page1 HTTP/1.1", "HTTP/1.1 200 OK", "Test notes")
+            FakeOrganizerItem(100, "GET /page1 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nbody", "Test notes")
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
@@ -342,7 +342,8 @@ class McpResourceHandlersTest {
 
         assertEquals(100, result["id"])
         assertEquals("GET /page1 HTTP/1.1", result["request"])
-        assertEquals("HTTP/1.1 200 OK", result["response"])
+        assertEquals("HTTP/1.1 200 OK", result["response_headers"])
+        assertEquals("body", result["response_body"])
         assertEquals("Test notes", result["notes"])
     }
 
@@ -397,5 +398,75 @@ class McpResourceHandlersTest {
         assertEquals("example.com", result["host"])
         assertEquals(443, result["port"])
         assertEquals(true, result["secure"])
+    }
+
+    @Test
+    fun `getOrganizerItem splits response into headers and body`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 100,
+                request = "GET /page HTTP/1.1",
+                response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<html>body</html>"
+            )
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(100)
+
+        assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
+        assertEquals("<html>body</html>", result["response_body"])
+        assertNull(result["response"])  // Old field should be gone
+    }
+
+    @Test
+    fun `getOrganizerItem truncates body by default`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 100,
+                request = "GET /page HTTP/1.1",
+                response = "HTTP/1.1 200 OK\r\n\r\n" + "X".repeat(500)
+            )
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(100)
+
+        assertEquals("X".repeat(100), result["response_body"])
+        assertEquals(true, result["response_body_truncated"])
+        assertEquals(500, result["response_body_total_length"])
+    }
+
+    @Test
+    fun `getOrganizerItem respects custom body_limit`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 100,
+                request = "GET /page HTTP/1.1",
+                response = "HTTP/1.1 200 OK\r\n\r\n" + "Y".repeat(500)
+            )
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(100, bodyLimit = 200)
+
+        assertEquals("Y".repeat(200), result["response_body"])
+        assertEquals(true, result["response_body_truncated"])
+    }
+
+    @Test
+    fun `getOrganizerItem returns full body when limit is zero`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 100,
+                request = "GET /page HTTP/1.1",
+                response = "HTTP/1.1 200 OK\r\n\r\n" + "Z".repeat(500)
+            )
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.getOrganizerItem(100, bodyLimit = 0)
+
+        assertEquals("Z".repeat(500), result["response_body"])
+        assertEquals(false, result["response_body_truncated"])
     }
 }

@@ -151,20 +151,23 @@ class McpResourceHandlers(
         )
     }
 
-    fun getOrganizerItem(id: Int): Map<String, Any?> {
+    fun getOrganizerItem(id: Int, bodyLimit: Int = 100): Map<String, Any?> {
         val items = organizerProvider?.getItemsByIds(setOf(id)) ?: emptyList()
         val item = items.firstOrNull()
             ?: return mapOf("error" to "not_found")
 
+        val (headers, body) = splitResponse(item.response)
+        val truncatedBody = TruncatedHttpBody(body, bodyLimit)
+
         return mapOf(
             "id" to item.id,
             "request" to item.request,
-            "response" to item.response,
+            "response_headers" to headers,
             "notes" to item.notes,
             "host" to item.host,
             "port" to item.port,
             "secure" to item.secure
-        )
+        ) + truncatedBody.toResponseFields()
     }
 
     // Documentation resources
