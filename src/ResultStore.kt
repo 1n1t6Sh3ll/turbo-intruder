@@ -31,6 +31,10 @@ class ResultStore : OutputHandler {
         return results.find { it.id == id }
     }
 
+    fun getRequestByIndex(index: Int): Request? {
+        return results.getOrNull(index)
+    }
+
     fun getResults(
         sortBy: SortField = SortField.ID,
         descending: Boolean = true,

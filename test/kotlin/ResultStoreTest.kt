@@ -221,4 +221,28 @@ class ResultStoreTest {
 
         assertEquals(emptySet<Int>(), statusCodes)
     }
+
+    @Test
+    fun `getRequestByIndex returns request at position regardless of ID`() {
+        val req1 = Request("GET /1 HTTP/1.1").apply { id = 100 }
+        val req2 = Request("GET /2 HTTP/1.1").apply { id = 200 }
+        val req3 = Request("GET /3 HTTP/1.1").apply { id = 300 }
+        store.add(req1)
+        store.add(req2)
+        store.add(req3)
+
+        assertSame(req1, store.getRequestByIndex(0))
+        assertSame(req2, store.getRequestByIndex(1))
+        assertSame(req3, store.getRequestByIndex(2))
+    }
+
+    @Test
+    fun `getRequestByIndex returns null for out of bounds index`() {
+        val req = Request("GET / HTTP/1.1").apply { id = 1 }
+        store.add(req)
+
+        assertNull(store.getRequestByIndex(-1))
+        assertNull(store.getRequestByIndex(1))
+        assertNull(store.getRequestByIndex(999))
+    }
 }

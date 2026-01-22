@@ -186,7 +186,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
             val currentSize = store.count()
             if (currentSize > lastKnownSize) {
                 for (i in lastKnownSize until currentSize) {
-                    val req = store.getRequest(i)
+                    val req = store.getRequestByIndex(i)
                     if (req != null) {
                         model.addRow(req)
                         if (lastKnownSize == 0) {
