@@ -188,6 +188,16 @@ class RequestEngine:
         handler.addRequestEngine(self.engine)  # was setRequestEngine
 ```
 
+### fast-http.kt (script initialization)
+
+Wire up outputHandler to RunHandler for anomaly ranking:
+
+```kotlin
+// In evalJython() or similar
+handler.setOutputHandler(store)  // new line
+pyInterp.set("outputHandler", store)  // existing
+```
+
 ### RequestTableModel.kt
 
 Add Engine column using the new engineName field:
@@ -264,6 +274,7 @@ Update RunHandlerTest.kt for multi-engine behavior.
 | `RequestEngine.kt` | Add `name` field, remove per-engine anomaly ranking | Small |
 | `Request.kt` | Add `engineName`, `globalId` fields | Tiny |
 | `ScriptEnvironment.py` | Add `name` param, `addRequestEngine()` | Small |
+| `fast-http.kt` | Wire outputHandler to RunHandler | Tiny |
 | `RequestTableModel.kt` | Add Engine column | Small |
 | `ResultStore.kt` | Add globalId assignment, update getRequest lookup | Small |
 | `McpResourceHandlers.kt` | Use globalId for lookups, include both IDs in responses | Small |
