@@ -59,7 +59,7 @@ Each engine has its own `lastRequestID` counter. With multiple engines, both cou
 - `globalId` is stable regardless of sort order (unlike list index)
 - MCP client uses `globalId` for lookups - unified view, no engine reasoning needed
 - Per-engine `request.id` unchanged - backwards compatible for scripts
-- MCP responses include both: `{"globalId": 42, "id": 5, "engine": "smuggler", ...}`
+- MCP responses include both: `{"globalId": 42, "id": 5, "engine": "smuggler", ...}` (globalId is 0-indexed)
 
 ### Issue #2: Engine Name Access (Fixed)
 
@@ -230,21 +230,23 @@ override fun getValueAt(rowIndex: Int, columnIndex: Int): Any {
 
 ### ResultStore.kt
 
-Assign global ID on result insertion:
+Assign global ID on result insertion. Use existing `getRequestByIndex()` for lookups since globalId matches list position:
 
 ```kotlin
 class ResultStore : OutputHandler {
     private val results = CopyOnWriteArrayList<Request>()
-    private val nextGlobalId = AtomicInteger(0)
+    // getRequestByIndex(index) already exists from commit 89fc8e5
 
     override fun add(req: Request) {
-        req.globalId = nextGlobalId.incrementAndGet()
+        req.globalId = results.size  // 0-indexed, matches list position
         results.add(req)
     }
 
-    fun getRequest(globalId: Int): Request? {
-        return results.find { it.globalId == globalId }
+    fun getRequestByGlobalId(globalId: Int): Request? {
+        return getRequestByIndex(globalId)  // reuse existing method
     }
+
+    // getRequest(id) unchanged - still looks up by per-engine request.id
 }
 ```
 
@@ -259,7 +261,7 @@ Update to use `globalId` for lookups and include engine info in responses:
 "engine" to req.engineName,
 
 // getRequest lookup uses globalId
-val request = run.store.getRequest(globalId)  // was getRequest(id)
+val request = run.store.getRequestByGlobalId(globalId)
 ```
 
 ### Tests
