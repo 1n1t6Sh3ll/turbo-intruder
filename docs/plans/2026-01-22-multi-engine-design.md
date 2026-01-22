@@ -27,8 +27,8 @@ def queueRequests(target, wordlists):
     verifier.complete()
 
 def handleResponse(req, interesting):
-    # req.engine.name available for filtering
-    if req.engine.name == "verifier" and "smuggled" in req.response:
+    # req.engineName available for filtering (or req.engine.name via Python wrapper)
+    if req.engineName == "verifier" and "smuggled" in req.response:
         table.add(req)
 ```
 
@@ -37,10 +37,10 @@ def handleResponse(req, interesting):
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Engine coordination | Independent (manual) | KISS - scripts manage timing via `complete()` |
-| Result storage | Merged with engine tag | Simple, filter by `req.engine.name` in callbacks |
+| Result storage | Merged with engine tag | Simple, filter by `req.engineName` in callbacks |
 | Status display | Aggregated totals | Clean UI: "Engines: 2 \| Reqs: 500 \| ..." |
 | Engine column in table | Always shown | Needed to disambiguate Queue ID and Connection ID |
-| Request IDs | Global counter | Avoid ID collisions across engines (see Issue #1) |
+| Request IDs | Global `globalId` assigned by ResultStore | Avoid ID collisions, stable across sorts (see Issue #1) |
 | Floodgates | Per-engine scope | Each engine has independent gates (documented limitation) |
 
 ## Issues Identified During Review
@@ -94,6 +94,11 @@ Replace single engine with list, centralize anomaly ranking:
 ```kotlin
 private val engines = mutableListOf<RequestEngine>()
 private var earliestStart: Long = 0
+private var outputHandler: OutputHandler? = null  // set during script init
+
+fun setOutputHandler(handler: OutputHandler) {
+    this.outputHandler = handler
+}
 
 fun addRequestEngine(engine: RequestEngine) {
     if (engines.isEmpty() || engine.start < earliestStart) {
@@ -139,7 +144,8 @@ fun statusString(): String {
 
 private fun calculateAnomalyRankings() {
     // Move logic from RequestEngine.calculateAnomalyRankings() here
-    // Operates on shared outputHandler once
+    // Uses this.outputHandler to get all requests
+    // Operates once after all engines complete
 }
 ```
 
@@ -232,6 +238,20 @@ class ResultStore : OutputHandler {
 }
 ```
 
+### MCP Resource/Tool Handlers
+
+Update to use `globalId` for lookups and include engine info in responses:
+
+```kotlin
+// McpResourceHandlers.kt - result listings
+"globalId" to req.globalId,
+"id" to req.id,  // per-engine queue order, kept for backwards compat
+"engine" to req.engineName,
+
+// getRequest lookup uses globalId
+val request = run.store.getRequest(globalId)  // was getRequest(id)
+```
+
 ### Tests
 
 Update RunHandlerTest.kt for multi-engine behavior.
@@ -250,23 +270,9 @@ Update RunHandlerTest.kt for multi-engine behavior.
 | `McpToolHandlers.kt` | Use globalId in result responses | Tiny |
 | `RunHandlerTest.kt` | Update tests | Small |
 
-### MCP Resource Handlers
-
-Update to use `globalId` for lookups and include both IDs in responses:
-
-```kotlin
-// McpResourceHandlers.kt - result listings
-"globalId" to req.globalId,
-"id" to req.id,  // per-engine queue order, kept for backwards compat
-"engine" to req.engineName,
-
-// getRequest lookup uses globalId
-val request = run.store.getRequest(globalId)  // was getRequest(id)
-```
-
 ## Not Changed
 
-- **MCP layer** - Uses RunHandler abstraction; minor updates to use globalId for lookups
+- **Core engine implementations** (ThreadedRequestEngine, BurpRequestEngine, HTTP2RequestEngine) - No changes needed
 
 ## Limitations
 
@@ -274,4 +280,4 @@ val request = run.store.getRequest(globalId)  // was getRequest(id)
 
 ## Estimated Effort
 
-~120-150 lines of code changes (excluding Issue #1 resolution). Small-medium scope.
+~150-180 lines of code changes. Small-medium scope.
