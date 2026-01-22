@@ -40,17 +40,65 @@ def handleResponse(req, interesting):
 | Result storage | Merged with engine tag | Simple, filter by `req.engine.name` in callbacks |
 | Status display | Aggregated totals | Clean UI: "Engines: 2 \| Reqs: 500 \| ..." |
 | Engine column in table | Always shown | Needed to disambiguate Queue ID and Connection ID |
+| Request IDs | Global counter | Avoid ID collisions across engines (see Issue #1) |
+| Floodgates | Per-engine scope | Each engine has independent gates (documented limitation) |
+
+## Issues Identified During Review
+
+### Issue #1: Request ID Collision (Critical) - RESOLVED
+
+Each engine has its own `lastRequestID` counter. With multiple engines, both could have requests with id=1, id=2, etc.
+
+**Affected code:**
+- `ResultStore.getRequest(id)` - returns first match, ambiguous
+- MCP endpoints like `turbo://runs/current/results/5`
+- Queue ID column in table
+
+**Solution:** Assign global `globalId` when results are added to ResultStore.
+
+- `globalId` is stable regardless of sort order (unlike list index)
+- MCP client uses `globalId` for lookups - unified view, no engine reasoning needed
+- Per-engine `request.id` unchanged - backwards compatible for scripts
+- MCP responses include both: `{"globalId": 42, "id": 5, "engine": "smuggler", ...}`
+
+### Issue #2: Engine Name Access (Fixed)
+
+**Problem:** Design incorrectly used `request.engine` (Python wrapper) instead of `request._engine` (Kotlin engine).
+
+**Fix:** Use `request._engine?.name ?: "default"` in RequestTableModel, or add `engineName: String` field to Request for cleaner access.
+
+### Issue #3: Anomaly Ranking Race Condition (Fixed)
+
+**Problem:** Each engine calls `calculateAnomalyRankings()` on completion, operating on the shared ResultStore. Multiple engines completing causes redundant work and potential UI races.
+
+**Fix:** Move anomaly ranking to RunHandler. Calculate once when ALL engines have completed.
+
+### Issue #4: Duration Tracking (Fixed)
+
+**Problem:** Aggregated status needs total run duration, but each engine tracks its own `start` time.
+
+**Fix:** RunHandler tracks `earliestStart` timestamp, updated when each engine is added. Duration = `now - earliestStart`.
+
+### Issue #5: Floodgates Are Per-Engine (Documentation)
+
+**Behavior:** Gate names are scoped to each engine. `engineA.openGate("sync")` won't affect `engineB`'s "sync" gate.
+
+**Fix:** Document this limitation. Cross-engine synchronization requires Python-level coordination.
 
 ## Changes Required
 
 ### RunHandler.kt
 
-Replace single engine with list:
+Replace single engine with list, centralize anomaly ranking:
 
 ```kotlin
 private val engines = mutableListOf<RequestEngine>()
+private var earliestStart: Long = 0
 
 fun addRequestEngine(engine: RequestEngine) {
+    if (engines.isEmpty() || engine.start < earliestStart) {
+        earliestStart = engine.start
+    }
     engines.add(engine)
     running = true
 }
@@ -67,6 +115,8 @@ fun abort() {
 
 fun setComplete() {
     engines.forEach { it.showStats(-1) }
+    // Calculate anomaly rankings once, after all engines complete
+    calculateAnomalyRankings()
 }
 
 fun statusString(): String {
@@ -78,22 +128,45 @@ fun statusString(): String {
     val totalConns = engines.sumOf { it.connections.get() }
     val totalRetries = engines.sumOf { it.retries.get() }
     val totalFails = engines.sumOf { it.permaFails.get() }
-    val duration = /* max duration across engines */
+    val duration = ceil(((System.nanoTime().toFloat() - earliestStart) / 1000000000).toDouble()).toInt()
 
     return String.format(
-        "Engines: %d | Reqs: %d | Queued: %d | Connections: %d | Retries: %d | Fails: %d%s",
-        engines.size, totalReqs, totalQueued, totalConns, totalRetries, totalFails,
+        "Engines: %d | Reqs: %d | Queued: %d | Duration: %d | Connections: %d | Retries: %d | Fails: %d%s",
+        engines.size, totalReqs, totalQueued, duration, totalConns, totalRetries, totalFails,
         if (msg.isNotEmpty()) " | $msg" else ""
     )
+}
+
+private fun calculateAnomalyRankings() {
+    // Move logic from RequestEngine.calculateAnomalyRankings() here
+    // Operates on shared outputHandler once
 }
 ```
 
 ### RequestEngine.kt
 
-Add name field:
+Add name field, remove per-engine anomaly ranking:
 
 ```kotlin
 var name: String = "default"
+
+// Remove or disable calculateAnomalyRankings() - now handled by RunHandler
+```
+
+### Request.kt
+
+Add engineName and globalId fields (keep existing `id` unchanged):
+
+```kotlin
+var engineName: String = "default"
+var globalId: Int = -1    // assigned by ResultStore, used for MCP lookups
+// var id: Int = -1       // unchanged, per-engine queue position
+```
+
+Set engineName in RequestEngine.queue():
+```kotlin
+request.engineName = this.name
+// request.id assignment unchanged
 ```
 
 ### ScriptEnvironment.py
@@ -111,7 +184,7 @@ class RequestEngine:
 
 ### RequestTableModel.kt
 
-Add Engine column:
+Add Engine column using the new engineName field:
 
 ```kotlin
 companion object {
@@ -123,7 +196,7 @@ companion object {
 
 override fun getColumnClass(columnIndex: Int): Class<*> {
     return when (columnIndex) {
-        // ... existing cases ...
+        // ... existing cases 0-10 ...
         11 -> String::class.java
         else -> throw RuntimeException("Invalid column requested")
     }
@@ -132,14 +205,32 @@ override fun getColumnClass(columnIndex: Int): Class<*> {
 override fun getValueAt(rowIndex: Int, columnIndex: Int): Any {
     val request = requests[rowIndex]
     return when (columnIndex) {
-        // ... existing cases ...
-        11 -> (request.engine as? RequestEngine)?.name ?: "default"
+        // ... existing cases 0-10 ...
+        11 -> request.engineName
         else -> throw RuntimeException("Invalid column requested")
     }
 }
 ```
 
-Note: Getting engine name requires casting since `request.engine` is `Any?` (the Python wrapper). May need to add a `engineName: String` field to Request instead for cleaner access.
+### ResultStore.kt
+
+Assign global ID on result insertion:
+
+```kotlin
+class ResultStore : OutputHandler {
+    private val results = CopyOnWriteArrayList<Request>()
+    private val nextGlobalId = AtomicInteger(0)
+
+    override fun add(req: Request) {
+        req.globalId = nextGlobalId.incrementAndGet()
+        results.add(req)
+    }
+
+    fun getRequest(globalId: Int): Request? {
+        return results.find { it.globalId == globalId }
+    }
+}
+```
 
 ### Tests
 
@@ -149,18 +240,38 @@ Update RunHandlerTest.kt for multi-engine behavior.
 
 | File | Change | Effort |
 |------|--------|--------|
-| `RunHandler.kt` | Multi-engine list, aggregated stats | Medium |
-| `RequestEngine.kt` | Add `name` field | Tiny |
+| `RunHandler.kt` | Multi-engine list, aggregated stats, centralized anomaly ranking | Medium |
+| `RequestEngine.kt` | Add `name` field, remove per-engine anomaly ranking | Small |
+| `Request.kt` | Add `engineName`, `globalId` fields | Tiny |
 | `ScriptEnvironment.py` | Add `name` param, `addRequestEngine()` | Small |
 | `RequestTableModel.kt` | Add Engine column | Small |
+| `ResultStore.kt` | Add globalId assignment, update getRequest lookup | Small |
+| `McpResourceHandlers.kt` | Use globalId for lookups, include both IDs in responses | Small |
+| `McpToolHandlers.kt` | Use globalId in result responses | Tiny |
 | `RunHandlerTest.kt` | Update tests | Small |
+
+### MCP Resource Handlers
+
+Update to use `globalId` for lookups and include both IDs in responses:
+
+```kotlin
+// McpResourceHandlers.kt - result listings
+"globalId" to req.globalId,
+"id" to req.id,  // per-engine queue order, kept for backwards compat
+"engine" to req.engineName,
+
+// getRequest lookup uses globalId
+val request = run.store.getRequest(globalId)  // was getRequest(id)
+```
 
 ## Not Changed
 
-- **MCP layer** - Uses RunHandler abstraction, no direct engine access
-- **ResultStore** - Already shared across engines
-- **Request.kt** - Already has `engine` field pointing to Python wrapper
+- **MCP layer** - Uses RunHandler abstraction; minor updates to use globalId for lookups
+
+## Limitations
+
+- **Floodgates are per-engine** - Gate names don't synchronize across engines. Use Python-level coordination for cross-engine synchronization.
 
 ## Estimated Effort
 
-~100-120 lines of code changes. Small-medium scope.
+~120-150 lines of code changes (excluding Issue #1 resolution). Small-medium scope.
