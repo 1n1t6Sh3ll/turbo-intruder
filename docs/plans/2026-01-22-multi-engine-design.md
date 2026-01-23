@@ -54,12 +54,13 @@ Each engine has its own `lastRequestID` counter. With multiple engines, both cou
 - MCP endpoints like `turbo://runs/current/results/5`
 - Queue ID column in table
 
-**Solution:** Assign global `globalId` when results are added to ResultStore.
+**Solution:** Assign global `globalId` atomically when results are added to ResultStore.
 
+- `globalId` assigned via `AtomicInteger.getAndIncrement()` - thread-safe, unique across concurrent engines
 - `globalId` is stable regardless of sort order (unlike list index)
 - MCP client uses `globalId` for lookups - unified view, no engine reasoning needed
 - Per-engine `request.id` unchanged - backwards compatible for scripts
-- MCP responses include both: `{"globalId": 42, "id": 5, "engine": "smuggler", ...}` (globalId is 0-indexed)
+- MCP responses include both: `{"globalId": 42, "id": 5, "engine": "smuggler", ...}`
 
 ### Issue #2: Engine Name Access (Fixed)
 
@@ -89,11 +90,11 @@ Each engine has its own `lastRequestID` counter. With multiple engines, both cou
 
 ### RunHandler.kt
 
-Replace single engine with list, centralize anomaly ranking:
+Replace single engine with thread-safe list, centralize anomaly ranking:
 
 ```kotlin
-private val engines = mutableListOf<RequestEngine>()
-private var earliestStart: Long = 0
+private val engines = CopyOnWriteArrayList<RequestEngine>()
+private var earliestStart: Long = Long.MAX_VALUE
 private var outputHandler: OutputHandler? = null  // set during script init
 
 fun setOutputHandler(handler: OutputHandler) {
@@ -101,10 +102,10 @@ fun setOutputHandler(handler: OutputHandler) {
 }
 
 fun addRequestEngine(engine: RequestEngine) {
-    if (engines.isEmpty() || engine.start < earliestStart) {
+    if (engine.start < earliestStart) {
         earliestStart = engine.start
     }
-    engines.add(engine)
+    engines.add(engine)  // CopyOnWriteArrayList is thread-safe
     running = true
 }
 
@@ -151,12 +152,24 @@ private fun calculateAnomalyRankings() {
 
 ### RequestEngine.kt
 
-Add name field, remove per-engine anomaly ranking:
+Add name field, remove per-engine anomaly ranking from `showStats()`:
 
 ```kotlin
 var name: String = "default"
 
-// Remove or disable calculateAnomalyRankings() - now handled by RunHandler
+// In showStats(), remove the calculateAnomalyRankings() call:
+fun showStats(delay: Int) {
+    if (delay == -1) {
+        while (attackState.get() < 3) {
+            showStats()
+            Thread.sleep(500)
+        }
+        showStats()
+        // REMOVED: calculateAnomalyRankings() - now handled by RunHandler.setComplete()
+        return
+    }
+    // ... rest unchanged
+}
 ```
 
 ### Request.kt
@@ -230,25 +243,34 @@ override fun getValueAt(rowIndex: Int, columnIndex: Int): Any {
 
 ### ResultStore.kt
 
-Assign global ID on result insertion. Use existing `getRequestByIndex()` for lookups since globalId matches list position:
+Assign global ID atomically on result insertion:
 
 ```kotlin
 class ResultStore : OutputHandler {
     private val results = CopyOnWriteArrayList<Request>()
-    // getRequestByIndex(index) already exists from commit 89fc8e5
+    private val nextGlobalId = AtomicInteger(0)
 
     override fun add(req: Request) {
-        req.globalId = results.size  // 0-indexed, matches list position
+        req.globalId = nextGlobalId.getAndIncrement()  // Thread-safe, unique IDs
         results.add(req)
     }
 
     fun getRequestByGlobalId(globalId: Int): Request? {
-        return getRequestByIndex(globalId)  // reuse existing method
+        // Can't use index lookup since globalId may not match position if
+        // concurrent adds complete out of order. Search instead:
+        return results.find { it.globalId == globalId }
+    }
+
+    fun clear() {
+        results.clear()
+        nextGlobalId.set(0)  // Reset counter on clear
     }
 
     // getRequest(id) unchanged - still looks up by per-engine request.id
 }
 ```
+
+Note: `globalId` is assigned atomically but results may be added to the list out of order under high concurrency. This means `globalId` may not equal list index. The `getRequestByGlobalId()` method searches by field value rather than assuming index correspondence.
 
 ### MCP Resource/Tool Handlers
 

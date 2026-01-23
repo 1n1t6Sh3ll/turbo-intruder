@@ -7,3 +7,6 @@ plan.md
 src/spec-*.md
 mcp-guidance/
 montoya-interface/
+logback.xml
+mcp-debug.log
+token-burn.md
