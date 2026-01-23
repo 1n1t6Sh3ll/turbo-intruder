@@ -219,12 +219,12 @@ class TurboMcpServer(
     private fun buildStatelessStartRunTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run")
-            .description("Start a new Turbo Intruder attack run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
+            .description("Start a new run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
-                    "script": { "type": "string", "description": "Python script code that controls the attack" },
+                    "script": { "type": "string", "description": "Python script code that controls the run" },
                     "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
                     "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
                     "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
@@ -255,12 +255,12 @@ class TurboMcpServer(
     private fun buildStatelessStartRunAsyncTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run_async")
-            .description("Start a new Turbo Intruder attack run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
+            .description("Start a new run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
-                    "script": { "type": "string", "description": "Python script code that controls the attack" },
+                    "script": { "type": "string", "description": "Python script code that controls the run" },
                     "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
                     "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
                     "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
@@ -289,12 +289,12 @@ class TurboMcpServer(
     private fun buildStatelessStartConcurrentRunAsyncTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_concurrent_run")
-            .description("Start a new concurrent attack run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
+            .description("Start a new concurrent run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
-                    "script": { "type": "string", "description": "Python script code that controls the attack" },
+                    "script": { "type": "string", "description": "Python script code that controls the run" },
                     "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
                     "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
                     "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
@@ -323,7 +323,7 @@ class TurboMcpServer(
     private fun buildStatelessStopRunTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("stop_run")
-            .description("Stop a running attack. Aborts the attack but preserves the results.")
+            .description("Stop the active run. Aborts the run but preserves the results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -523,14 +523,14 @@ class TurboMcpServer(
     private fun buildStartRunTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run")
-            .description("Start a new Turbo Intruder attack run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
+            .description("Start a new run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
                     "script": {
                         "type": "string",
-                        "description": "Python script code that controls the attack"
+                        "description": "Python script code that controls the run"
                     },
                     "base_request": {
                         "type": "string",
@@ -580,14 +580,14 @@ class TurboMcpServer(
     private fun buildStartRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run_async")
-            .description("Start a new Turbo Intruder attack run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
+            .description("Start a new run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
                     "script": {
                         "type": "string",
-                        "description": "Python script code that controls the attack"
+                        "description": "Python script code that controls the run"
                     },
                     "base_request": {
                         "type": "string",
@@ -632,14 +632,14 @@ class TurboMcpServer(
     private fun buildStartConcurrentRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_concurrent_run")
-            .description("Start a new concurrent attack run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
+            .description("Start a new concurrent run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
                     "script": {
                         "type": "string",
-                        "description": "Python script code that controls the attack"
+                        "description": "Python script code that controls the run"
                     },
                     "base_request": {
                         "type": "string",
@@ -684,7 +684,7 @@ class TurboMcpServer(
     private fun buildStopRunTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("stop_run")
-            .description("Stop a running attack. Aborts the attack but preserves the results.")
+            .description("Stop the active run. Aborts the run but preserves the results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -948,8 +948,8 @@ class TurboMcpServer(
     private fun buildStatelessRunsListResource(): McpStatelessServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
             .uri("turbo://runs")
-            .name("List of all Turbo Intruder runs")
-            .description("List all attack runs with their status and result counts")
+            .name("List of all runs")
+            .description("List all runs with their status and result counts")
             .mimeType("application/json")
             .build()
 
@@ -1116,7 +1116,7 @@ class TurboMcpServer(
     private fun buildStatelessDocsListResource(): McpStatelessServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
             .uri("turbo://docs")
-            .name("Turbo Intruder documentation topics")
+            .name("Documentation topics")
             .description("List available documentation topics for scripting reference")
             .mimeType("application/json")
             .build()
@@ -1183,8 +1183,8 @@ class TurboMcpServer(
     private fun buildRunsListResource(): McpServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
             .uri("turbo://runs")
-            .name("List of all Turbo Intruder runs")
-            .description("List all attack runs with their status and result counts")
+            .name("List of all runs")
+            .description("List all runs with their status and result counts")
             .mimeType("application/json")
             .build()
 
@@ -1351,7 +1351,7 @@ class TurboMcpServer(
     private fun buildDocsListResource(): McpServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
             .uri("turbo://docs")
-            .name("Turbo Intruder documentation topics")
+            .name("Documentation topics")
             .description("List available documentation topics for scripting reference")
             .mimeType("application/json")
             .build()

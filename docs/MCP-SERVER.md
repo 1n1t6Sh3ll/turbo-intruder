@@ -17,9 +17,9 @@ Server listens on `localhost:31337` using streaming HTTP transport.
 
 | Tool | Description |
 |------|-------------|
-| `start_run` | Start attack (clears previous) |
-| `start_concurrent_run` | Start parallel attack |
-| `stop_run` | Stop a running attack |
+| `start_run` | Start run (clears previous) |
+| `start_concurrent_run` | Start parallel run |
+| `stop_run` | Stop the active run |
 | `delete_run` | Remove run and results |
 | `delete_all_runs` | Clean up all runs |
 
