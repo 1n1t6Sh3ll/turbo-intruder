@@ -351,18 +351,6 @@ class McpResourceHandlers(
                 val topic = parseDocTopic(uri) ?: return mapOf("error" to "invalid_topic")
                 getDoc(topic)
             }
-            uri.matches(Regex("turbo://results/\\d+.*")) -> {
-                val requestId = Regex("turbo://results/(\\d+)").find(uri)?.groupValues?.get(1)?.toIntOrNull()
-                    ?: return mapOf("error" to "invalid_request_id")
-                val params = parseQueryParams(uri)
-                getRequestDetail(
-                    sessionId = sessionId,
-                    runId = null,
-                    requestId = requestId,
-                    bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
-                    exportFile = params["export"] == "file"
-                )
-            }
             uri.matches(Regex("turbo://runs/[^/]+/\\d+.*")) -> {
                 val runId = parseRunId(uri)
                 val requestId = parseRequestId(uri) ?: return mapOf("error" to "invalid_request_id")

@@ -937,7 +937,6 @@ class TurboMcpServer(
             buildStatelessRunStatusResourceTemplate(),
             buildStatelessRunResultsResourceTemplate(),
             buildStatelessRequestDetailResourceTemplate(),
-            buildStatelessShorthandRequestDetailResourceTemplate(),
             buildStatelessOrganizerListResource(),
             buildStatelessOrganizerByDomainResourceTemplate(),
             buildStatelessOrganizerItemResourceTemplate(),
@@ -1040,26 +1039,6 @@ class TurboMcpServer(
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     uri,
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessShorthandRequestDetailResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://results/{id}")
-            .name("Details of a specific result (shorthand)")
-            .description("Shorthand for turbo://runs/current/results/{id}. Get request and response details from the current run.")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val result = resourceHandlers.handleResourceRead(STATELESS_SESSION_ID, request.uri())
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    request.uri(),
                     "application/json",
                     jsonMapper.writeValueAsString(result)
                 ))
@@ -1198,7 +1177,6 @@ class TurboMcpServer(
             buildRunStatusResourceTemplate(),
             buildRunResultsResourceTemplate(),
             buildRequestDetailResourceTemplate(),
-            buildShorthandRequestDetailResourceTemplate(),
             buildOrganizerListResource(),
             buildOrganizerByDomainResourceTemplate(),
             buildOrganizerItemResourceTemplate(),
@@ -1301,26 +1279,6 @@ class TurboMcpServer(
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     uri,
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildShorthandRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://results/{id}")
-            .name("Details of a specific result (shorthand)")
-            .description("Shorthand for turbo://runs/current/results/{id}. Get request and response details from the current run.")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
-            val result = resourceHandlers.handleResourceRead(exchange.sessionId(), request.uri())
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    request.uri(),
                     "application/json",
                     jsonMapper.writeValueAsString(result)
                 ))

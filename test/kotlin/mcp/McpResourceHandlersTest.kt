@@ -243,14 +243,14 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead supports shorthand turbo requests id for current run`() {
+    fun `handleResourceRead routes result by id for current run`() {
         val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 36
         request.response = "HTTP/1.1 200 OK\r\n\r\ntest body"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://results/36")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/36")
 
         assertEquals("test body", result["response_body"])
         assertEquals(200, result["status"])
