@@ -363,7 +363,7 @@ class McpResourceHandlers(
                     exportFile = params["export"] == "file"
                 )
             }
-            uri.matches(Regex("turbo://runs/[^/]+/results/\\d+.*")) -> {
+            uri.matches(Regex("turbo://runs/[^/]+/\\d+.*")) -> {
                 val runId = parseRunId(uri)
                 val requestId = parseRequestId(uri) ?: return mapOf("error" to "invalid_request_id")
                 val params = parseQueryParams(uri)

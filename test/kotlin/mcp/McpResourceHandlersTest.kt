@@ -207,7 +207,7 @@ class McpResourceHandlersTest {
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "Z".repeat(500)
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/results/1?body_limit=50")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/1?body_limit=50")
 
         assertEquals("Z".repeat(50), result["response_body"])
     }
@@ -220,7 +220,7 @@ class McpResourceHandlersTest {
         request.response = "HTTP/1.1 200 OK\r\n\r\ndata"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/results/1?export=file")
+        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/1?export=file")
 
         assertNotNull(result["response_file"])
         assertNull(result["response_body"])
