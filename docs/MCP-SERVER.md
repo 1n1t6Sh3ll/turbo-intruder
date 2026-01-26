@@ -38,7 +38,7 @@ Server listens on `localhost:31337` using streaming HTTP transport.
 | `turbo://runs` | List all runs |
 | `turbo://runs/{id}` | Run status |
 | `turbo://runs/{id}/summary` | Query summary (supports `?sort_by=`, `?limit=`, `?offset=`) |
-| `turbo://runs/{id}/requests/{n}` | Full request/response detail |
+| `turbo://runs/{id}/{n}` | Full request/response detail (supports `?body_limit=`, `?export=file`) |
 
 Use `current` as the run ID to reference the most recent run.
 
