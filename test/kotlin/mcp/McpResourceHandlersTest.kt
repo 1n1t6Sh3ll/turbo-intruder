@@ -630,4 +630,135 @@ class McpResourceHandlersTest {
 
         assertEquals("HTTP/1.1 200 OK\r\nX-Custom: value", result["response_headers"])
     }
+
+    // Domain filtering tests
+
+    @Test
+    fun `listOrganizerItems with domain filter returns only matching items`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "other.com"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com")
+
+        assertEquals(2, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        // Sorted by ID descending (timestamps are null)
+        assertEquals(listOf(3, 1), items.map { it["id"] })
+    }
+
+    @Test
+    fun `listOrganizerItems with domain filter paginates 10 per page`() {
+        // Create 25 items for example.com
+        val items = (1..25).map {
+            FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        }
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com")
+
+        assertEquals(25, result["count"])
+        assertEquals(1, result["page"])
+        assertEquals(10, result["page_size"])
+        assertEquals(3, result["total_pages"])
+        @Suppress("UNCHECKED_CAST")
+        val returnedItems = result["items"] as List<Map<String, Any?>>
+        assertEquals(10, returnedItems.size)
+    }
+
+    @Test
+    fun `listOrganizerItems with domain filter supports page parameter`() {
+        // Create 25 items for example.com
+        val items = (1..25).map {
+            FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        }
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com", page = 3)
+
+        assertEquals(25, result["count"])
+        assertEquals(3, result["page"])
+        assertEquals(3, result["total_pages"])
+        @Suppress("UNCHECKED_CAST")
+        val returnedItems = result["items"] as List<Map<String, Any?>>
+        assertEquals(5, returnedItems.size)  // Last page has only 5 items
+    }
+
+    @Test
+    fun `listOrganizerItems with domain filter sorts by timestamp descending`() {
+        val now = java.time.ZonedDateTime.now()
+        val items = listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = now.minusHours(2)),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = now),  // Most recent
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = now.minusHours(1))
+        )
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com")
+
+        @Suppress("UNCHECKED_CAST")
+        val returnedItems = result["items"] as List<Map<String, Any?>>
+        // Should be sorted: most recent first (2, 3, 1)
+        assertEquals(listOf(2, 3, 1), returnedItems.map { it["id"] })
+    }
+
+    @Test
+    fun `listOrganizerItems with domain filter sorts nulls last then by ID descending`() {
+        val now = java.time.ZonedDateTime.now()
+        val items = listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = null),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = now),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = null),
+            FakeOrganizerItem(4, "GET /4 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com", timeRequestSent = now.minusHours(1))
+        )
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com")
+
+        @Suppress("UNCHECKED_CAST")
+        val returnedItems = result["items"] as List<Map<String, Any?>>
+        // Items with timestamps first (2, 4), then nulls sorted by ID descending (3, 1)
+        assertEquals(listOf(2, 4, 3, 1), returnedItems.map { it["id"] })
+    }
+
+    @Test
+    fun `handleResourceRead parses domain query param for organizer`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "other.com"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer?domain=example.com")
+
+        assertEquals(2, result["count"])
+        assertEquals(1, result["page"])
+    }
+
+    @Test
+    fun `handleResourceRead parses domain and page query params for organizer`() {
+        // Create 15 items for example.com
+        val items = (1..15).map {
+            FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        }
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer?domain=example.com&page=2")
+
+        assertEquals(15, result["count"])
+        assertEquals(2, result["page"])
+        @Suppress("UNCHECKED_CAST")
+        val returnedItems = result["items"] as List<Map<String, Any?>>
+        assertEquals(5, returnedItems.size)  // Page 2 has 5 items (11-15)
+    }
 }

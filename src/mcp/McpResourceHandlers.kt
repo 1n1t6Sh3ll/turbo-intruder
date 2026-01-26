@@ -152,12 +152,40 @@ class McpResourceHandlers(
 
     // Organizer resources
 
-    fun listOrganizerItems(): Map<String, Any> {
-        val items = organizerProvider?.getItems() ?: emptyList()
-        return mapOf(
-            "count" to items.size,
-            "items" to items.map { mapOf("id" to it.id) }
-        )
+    fun listOrganizerItems(domain: String? = null, page: Int = 1): Map<String, Any> {
+        val allItems = organizerProvider?.getItems() ?: emptyList()
+        val filteredItems = if (domain != null) {
+            allItems.filter { it.host == domain }
+        } else {
+            allItems
+        }
+
+        // Apply sorting and pagination only when filtering
+        return if (domain != null) {
+            // Sort by timestamp descending (nulls last), then by ID descending as tiebreaker
+            val sortedItems = filteredItems.sortedWith(
+                compareByDescending<OrganizerItemData> { it.timeRequestSent }
+                    .thenByDescending { it.id }
+            )
+
+            val pageSize = 10
+            val totalPages = (sortedItems.size + pageSize - 1) / pageSize
+            val startIndex = (page - 1) * pageSize
+            val pagedItems = sortedItems.drop(startIndex).take(pageSize)
+
+            mapOf(
+                "count" to sortedItems.size,
+                "page" to page,
+                "page_size" to pageSize,
+                "total_pages" to totalPages,
+                "items" to pagedItems.map { mapOf("id" to it.id) }
+            )
+        } else {
+            mapOf(
+                "count" to filteredItems.size,
+                "items" to filteredItems.map { mapOf("id" to it.id) }
+            )
+        }
     }
 
     fun getOrganizerItem(id: Int, bodyLimit: Int = 100): Map<String, Any?> {
@@ -300,7 +328,13 @@ class McpResourceHandlers(
     fun handleResourceRead(sessionId: String, uri: String): Map<String, Any?> {
         return when {
             uri == "turbo://runs" -> listRuns(sessionId)
-            uri == "turbo://organizer" -> listOrganizerItems()
+            uri == "turbo://organizer" || uri.startsWith("turbo://organizer?") -> {
+                val params = parseQueryParams(uri)
+                listOrganizerItems(
+                    domain = params["domain"],
+                    page = params["page"]?.toIntOrNull() ?: 1
+                )
+            }
             uri.matches(Regex("turbo://organizer/[\\d,]+.*")) -> {
                 val ids = parseOrganizerIds(uri)
                 if (ids.isEmpty()) return mapOf("error" to "invalid_organizer_id")

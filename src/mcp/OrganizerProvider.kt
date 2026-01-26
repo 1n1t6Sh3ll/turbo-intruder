@@ -10,7 +10,8 @@ data class OrganizerItemData(
     val notes: String,
     val host: String,
     val port: Int,
-    val secure: Boolean
+    val secure: Boolean,
+    val timeRequestSent: java.time.ZonedDateTime? = null
 )
 
 interface OrganizerProvider {
@@ -32,7 +33,8 @@ class BurpOrganizerProvider : OrganizerProvider {
                 notes = item.annotations()?.notes() ?: "",
                 host = httpService?.host() ?: "",
                 port = httpService?.port() ?: 0,
-                secure = httpService?.secure() ?: false
+                secure = httpService?.secure() ?: false,
+                timeRequestSent = item.timingData().orElse(null)?.timeRequestSent()
             )
         }
     }
@@ -49,7 +51,8 @@ class BurpOrganizerProvider : OrganizerProvider {
                 notes = item.annotations()?.notes() ?: "",
                 host = httpService?.host() ?: "",
                 port = httpService?.port() ?: 0,
-                secure = httpService?.secure() ?: false
+                secure = httpService?.secure() ?: false,
+                timeRequestSent = item.timingData().orElse(null)?.timeRequestSent()
             )
         }
     }

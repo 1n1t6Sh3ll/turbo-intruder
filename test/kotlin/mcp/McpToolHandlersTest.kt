@@ -389,7 +389,8 @@ data class FakeOrganizerItem(
     var notes: String = "",
     val host: String = "example.com",
     val port: Int = 443,
-    val secure: Boolean = true
+    val secure: Boolean = true,
+    val timeRequestSent: java.time.ZonedDateTime? = null
 )
 
 class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider {
@@ -397,11 +398,11 @@ class FakeOrganizerProvider(items: List<FakeOrganizerItem>) : OrganizerProvider 
     val sentItems = mutableListOf<Pair<burp.Request, String>>()
 
     override fun getItems(): List<OrganizerItemData> {
-        return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes, it.host, it.port, it.secure) }
+        return items.map { OrganizerItemData(it.id, it.request, it.response, it.notes, it.host, it.port, it.secure, it.timeRequestSent) }
     }
 
     override fun getItemsByIds(ids: Set<Int>): List<OrganizerItemData> {
-        return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response, it.notes, it.host, it.port, it.secure) }
+        return items.filter { it.id in ids }.map { OrganizerItemData(it.id, it.request, it.response, it.notes, it.host, it.port, it.secure, it.timeRequestSent) }
     }
 
     override fun setNotes(id: Int, notes: String): Boolean {
