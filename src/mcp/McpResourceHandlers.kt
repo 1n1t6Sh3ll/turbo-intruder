@@ -289,7 +289,7 @@ class McpResourceHandlers(
     }
 
     fun parseRequestId(uri: String): Int? {
-        val match = Regex("turbo://runs/[^/]+/results/(\\d+)").find(uri)
+        val match = Regex("turbo://runs/[^/]+/(\\d+)").find(uri)
         return match?.groupValues?.get(1)?.toIntOrNull()
     }
 

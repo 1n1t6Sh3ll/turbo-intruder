@@ -82,7 +82,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `parseUri extracts request_id correctly`() {
-        assertEquals(42, handlers.parseRequestId("turbo://runs/abc123/results/42"))
+        assertEquals(42, handlers.parseRequestId("turbo://runs/abc123/42"))
         assertNull(handlers.parseRequestId("turbo://runs/abc123/summary"))
     }
 
