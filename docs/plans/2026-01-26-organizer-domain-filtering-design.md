@@ -7,15 +7,19 @@ Add domain filtering and pagination to the organizer items MCP resource.
 ## API
 
 ```
-turbo://organizer?domain=example.com           # page 1
-turbo://organizer?domain=example.com&page=2    # page 2
+turbo://organizer                              # all items (no pagination)
+turbo://organizer/by-domain/example.com        # page 1
+turbo://organizer/by-domain/example.com?page=2 # page 2
 ```
+
+Note: Path-based filtering is used because the MCP Java SDK doesn't support
+RFC 6570 query param templates like `{?domain,page}`.
 
 ## Behavior
 
-- `domain` parameter: exact match on host
+- Domain matching: exact match on host
 - When filtering: paginated (10 per page), sorted by timestamp desc (nulls last), then ID desc
-- Without filter: unchanged (returns all IDs, no pagination)
+- Without filter: returns all IDs, no pagination
 
 ## Response Format (when filtered)
 
@@ -32,6 +36,6 @@ turbo://organizer?domain=example.com&page=2    # page 2
 ## Implementation
 
 1. Add `timeRequestSent: ZonedDateTime?` to `OrganizerItemData`
-2. Add `getItemsByDomain(domain: String, page: Int, pageSize: Int)` to `OrganizerProvider`
-3. Update `BurpOrganizerProvider` to populate timestamp and implement domain filtering with sort/pagination
-4. Update `McpResourceHandlers.listOrganizerItems()` to parse `domain` and `page` params
+2. Update `BurpOrganizerProvider` to populate timestamp from `timingData()`
+3. Add sorting and pagination in `McpResourceHandlers.listOrganizerItems()`
+4. Register separate MCP resources for base list and domain-filtered list
