@@ -761,4 +761,53 @@ class McpResourceHandlersTest {
         val returnedItems = result["items"] as List<Map<String, Any?>>
         assertEquals(5, returnedItems.size)  // Page 2 has 5 items (11-15)
     }
+
+    @Test
+    fun `listOrganizerItems without filter returns no pagination metadata`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "other.com")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems()
+
+        assertEquals(2, result["count"])
+        assertFalse(result.containsKey("page"))
+        assertFalse(result.containsKey("page_size"))
+        assertFalse(result.containsKey("total_pages"))
+    }
+
+    @Test
+    fun `listOrganizerItems with non-matching domain returns empty paginated result`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "nonexistent.com")
+
+        assertEquals(0, result["count"])
+        assertEquals(1, result["page"])
+        assertEquals(0, result["total_pages"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertTrue(items.isEmpty())
+    }
+
+    @Test
+    fun `listOrganizerItems domain filter is case-sensitive`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "Example.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com")
+
+        assertEquals(1, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(listOf(2), items.map { it["id"] })
+    }
 }

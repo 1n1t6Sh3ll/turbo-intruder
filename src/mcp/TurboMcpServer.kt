@@ -939,6 +939,7 @@ class TurboMcpServer(
             buildStatelessRequestDetailResourceTemplate(),
             buildStatelessShorthandRequestDetailResourceTemplate(),
             buildStatelessOrganizerListResource(),
+            buildStatelessOrganizerByDomainResourceTemplate(),
             buildStatelessOrganizerItemResourceTemplate(),
             buildStatelessDocsListResource(),
             buildStatelessDocTopicResourceTemplate()
@@ -1086,6 +1087,31 @@ class TurboMcpServer(
         }
     }
 
+    private fun buildStatelessOrganizerByDomainResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://organizer/by-domain/{domain}")
+            .name("Organizer items filtered by domain")
+            .description("List Organizer items for a specific domain, paginated (10 per page). Add ?page=N for pagination.")
+            .mimeType("application/json")
+            .build()
+
+        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
+            val domain = Regex("turbo://organizer/by-domain/([^/?]+)").find(request.uri())?.groupValues?.get(1)
+            val params = resourceHandlers.parseQueryParams(request.uri())
+            val result = resourceHandlers.listOrganizerItems(
+                domain = domain,
+                page = params["page"]?.toIntOrNull() ?: 1
+            )
+            McpSchema.ReadResourceResult(
+                listOf(McpSchema.TextResourceContents(
+                    request.uri(),
+                    "application/json",
+                    jsonMapper.writeValueAsString(result)
+                ))
+            )
+        }
+    }
+
     private fun buildStatelessOrganizerItemResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
             .uri("turbo://organizer/{id}")
@@ -1174,6 +1200,7 @@ class TurboMcpServer(
             buildRequestDetailResourceTemplate(),
             buildShorthandRequestDetailResourceTemplate(),
             buildOrganizerListResource(),
+            buildOrganizerByDomainResourceTemplate(),
             buildOrganizerItemResourceTemplate(),
             buildDocsListResource(),
             buildDocTopicResourceTemplate()
@@ -1314,6 +1341,31 @@ class TurboMcpServer(
             McpSchema.ReadResourceResult(
                 listOf(McpSchema.TextResourceContents(
                     "turbo://organizer",
+                    "application/json",
+                    jsonMapper.writeValueAsString(result)
+                ))
+            )
+        }
+    }
+
+    private fun buildOrganizerByDomainResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
+        val resource = McpSchema.Resource.builder()
+            .uri("turbo://organizer/by-domain/{domain}")
+            .name("Organizer items filtered by domain")
+            .description("List Organizer items for a specific domain, paginated (10 per page). Add ?page=N for pagination.")
+            .mimeType("application/json")
+            .build()
+
+        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
+            val domain = Regex("turbo://organizer/by-domain/([^/?]+)").find(request.uri())?.groupValues?.get(1)
+            val params = resourceHandlers.parseQueryParams(request.uri())
+            val result = resourceHandlers.listOrganizerItems(
+                domain = domain,
+                page = params["page"]?.toIntOrNull() ?: 1
+            )
+            McpSchema.ReadResourceResult(
+                listOf(McpSchema.TextResourceContents(
+                    request.uri(),
                     "application/json",
                     jsonMapper.writeValueAsString(result)
                 ))

@@ -71,4 +71,54 @@ class TurboMcpServerTest {
 
         server.stop()
     }
+
+    @Test
+    fun `organizer list resource supports domain filter via URI template`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "target.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "other.com"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", host = "target.com")
+        ))
+        val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
+
+        // Test that resourceHandlers correctly handles domain filter
+        val result = server.resourceHandlers.listOrganizerItems(domain = "target.com")
+
+        assertEquals(2, result["count"])
+        assertEquals(1, result["page"])
+        assertEquals(10, result["page_size"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        // Sorted by ID descending (no timestamps)
+        assertEquals(listOf(3, 1), items.map { it["id"] })
+    }
+
+    @Test
+    fun `organizer list resource supports pagination via URI template`() {
+        // Create 25 items
+        val items = (1..25).map {
+            FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", host = "target.com")
+        }
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
+
+        val page1 = server.resourceHandlers.listOrganizerItems(domain = "target.com", page = 1)
+        val page2 = server.resourceHandlers.listOrganizerItems(domain = "target.com", page = 2)
+        val page3 = server.resourceHandlers.listOrganizerItems(domain = "target.com", page = 3)
+
+        assertEquals(25, page1["count"])
+        assertEquals(1, page1["page"])
+        assertEquals(3, page1["total_pages"])
+
+        assertEquals(2, page2["page"])
+        assertEquals(3, page3["page"])
+
+        @Suppress("UNCHECKED_CAST")
+        val page1Items = page1["items"] as List<Map<String, Any?>>
+        @Suppress("UNCHECKED_CAST")
+        val page3Items = page3["items"] as List<Map<String, Any?>>
+
+        assertEquals(10, page1Items.size)
+        assertEquals(5, page3Items.size)
+    }
 }
