@@ -1017,7 +1017,7 @@ class TurboMcpServer(
 
     private fun buildStatelessRequestDetailResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/results/{id}")
+            .uri("turbo://runs/{run_id}/{id}")
             .name("Details of a specific result")
             .description("Get request and response details for a result. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
             .mimeType("application/json")
@@ -1231,7 +1231,7 @@ class TurboMcpServer(
 
     private fun buildRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
         val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/results/{id}")
+            .uri("turbo://runs/{run_id}/{id}")
             .name("Details of a specific result")
             .description("Get request and response details for a result. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
             .mimeType("application/json")
