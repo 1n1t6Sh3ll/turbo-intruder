@@ -37,7 +37,7 @@ class McpResourceHandlers(
         val run = manager.getRun(sessionId, runId)
             ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
 
-        return mapOf(
+        val baseStatus = mapOf(
             "run_id" to run.id,
             "running" to run.handler.isRunning(),
             "finished" to run.handler.hasFinished(),
@@ -45,6 +45,26 @@ class McpResourceHandlers(
             "result_count" to run.store.count(),
             "created_at" to run.createdAt
         )
+
+        // Include summary when run is finished
+        if (run.handler.hasFinished()) {
+            val results = run.store.getResults(SortField.ANOMALY_RANK, true, 20, 0)
+            val summary = results.map { req ->
+                mapOf(
+                    "id" to req.id,
+                    "status" to req.code,
+                    "length" to req.length,
+                    "time" to req.time,
+                    "wordcount" to req.wordcount,
+                    "words" to req.words,
+                    "label" to req.label,
+                    "anomaly_rank" to req.anomalyRank
+                )
+            }
+            return baseStatus + mapOf("summary" to summary)
+        }
+
+        return baseStatus
     }
 
     fun getResults(

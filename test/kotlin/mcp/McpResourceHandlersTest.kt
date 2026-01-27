@@ -54,6 +54,56 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `getRunStatus includes summary when run is finished`() {
+        val run = manager.startRun(testSessionId)
+
+        // Add some results
+        val req1 = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        req1.anomalyRank = 100
+
+        val req2 = burp.Request("GET /2 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 2
+        req2.response = "HTTP/1.1 404 Not Found\r\n\r\nnot found"
+        req2.anomalyRank = 50
+
+        run.store.add(req1)
+        run.store.add(req2)
+
+        // Mark run as finished (no engine created, so markScriptCompleted will trigger hasFinished=true)
+        run.handler.markScriptCompleted()
+
+        val result = handlers.getRunStatus(testSessionId, null)
+
+        assertEquals(true, result["finished"])
+        // Should include summary when finished
+        @Suppress("UNCHECKED_CAST")
+        val summary = result["summary"] as? List<Map<String, Any?>>
+        assertNotNull(summary, "Status should include summary when run is finished")
+        assertEquals(2, summary!!.size)
+        // Summary should be sorted by anomaly_rank descending
+        assertEquals(100, summary[0]["anomaly_rank"])
+        assertEquals(50, summary[1]["anomaly_rank"])
+    }
+
+    @Test
+    fun `getRunStatus does not include summary when run is still running`() {
+        val run = manager.startRun(testSessionId)
+
+        // Add a result but don't mark as finished
+        val req = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req.id = 1
+        req.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        run.store.add(req)
+
+        val result = handlers.getRunStatus(testSessionId, null)
+
+        assertEquals(false, result["finished"])
+        assertNull(result["summary"], "Status should NOT include summary when run is still running")
+    }
+
+    @Test
     fun `getResults returns empty list when no results`() {
         manager.startRun(testSessionId)
 
