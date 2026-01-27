@@ -14,15 +14,49 @@ class RunManager {
     var currentRun: ActiveRun? = null
         private set
 
+    // Size threshold for cleanup (default 300MB)
+    var cleanupThresholdBytes: Long = 300L * 1024 * 1024
+
     // Session-aware methods
 
     fun startRun(sessionId: String): ActiveRun {
-        deleteAllRuns(sessionId)
+        cleanupIfOverThreshold(sessionId)
         val run = ActiveRun(sessionId)
         runs[run.id] = run
         currentRunBySession[sessionId] = run.id
         currentRun = run  // Legacy compatibility
         return run
+    }
+
+    private fun cleanupIfOverThreshold(sessionId: String) {
+        while (getTotalSizeBytes(sessionId) > cleanupThresholdBytes) {
+            val oldestRun = runs.values
+                .filter { it.ownerSessionId == sessionId }
+                .minByOrNull { it.createdAt }
+                ?: break
+            runs.remove(oldestRun.id)
+            oldestRun.handler.abort()
+            if (currentRunBySession[sessionId] == oldestRun.id) {
+                currentRunBySession.remove(sessionId)
+            }
+            if (currentRun?.id == oldestRun.id) {
+                currentRun = null
+            }
+        }
+    }
+
+    fun getTotalSizeBytes(sessionId: String): Long {
+        return runs.values
+            .filter { it.ownerSessionId == sessionId }
+            .sumOf { run -> getRunSizeBytes(run) }
+    }
+
+    private fun getRunSizeBytes(run: ActiveRun): Long {
+        return run.store.getAllRquests().sumOf { request ->
+            val templateSize = request.template.length.toLong()
+            val responseSize = request.response?.length?.toLong() ?: 0L
+            templateSize + responseSize
+        }
     }
 
     fun startConcurrentRun(sessionId: String): ActiveRun {
@@ -82,7 +116,7 @@ class RunManager {
     // Legacy session-less methods for backward compatibility
 
     fun startRun(): ActiveRun {
-        deleteAllRuns()
+        cleanupIfOverThreshold("legacy")
         val run = ActiveRun("legacy")
         runs[run.id] = run
         currentRun = run

@@ -14,11 +14,12 @@ class RunManagerTest {
     }
 
     @Test
-    fun `startRun clears existing runs and creates new current run`() {
+    fun `startRun preserves existing runs when under threshold`() {
         val run1 = manager.startConcurrentRun()
         val run2 = manager.startRun()
 
-        assertNull(manager.getRun(run1.id))
+        // run1 should still exist (under threshold)
+        assertNotNull(manager.getRun(run1.id))
         assertNotNull(manager.currentRun)
         assertEquals(run2.id, manager.currentRun?.id)
     }
@@ -97,7 +98,7 @@ class RunManagerTest {
     // Session-scoped tests
 
     @Test
-    fun `startRun with sessionId only clears that session's runs`() {
+    fun `startRun with sessionId preserves that session's runs when under threshold`() {
         val sessionA = "session-a"
         val sessionB = "session-b"
 
@@ -109,8 +110,8 @@ class RunManagerTest {
 
         // Session B's run should still exist
         assertNotNull(manager.getRun(sessionB, runB.id))
-        // Session A's old run should be gone
-        assertNull(manager.getRun(sessionA, runA.id))
+        // Session A's old run should still exist (under threshold)
+        assertNotNull(manager.getRun(sessionA, runA.id))
         // Session A's new run should be current
         assertEquals(runA2.id, manager.getRun(sessionA, null)?.id)
     }
@@ -179,5 +180,71 @@ class RunManagerTest {
 
         assertEquals("deleted", result)
         assertNull(manager.getRun(sessionA, runA.id))
+    }
+
+    // Size-based cleanup tests
+
+    @Test
+    fun `startRun preserves existing runs when under size threshold`() {
+        val session = "session-a"
+
+        // Create a run with some data
+        val run1 = manager.startConcurrentRun(session)
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: test\r\n\r\n")
+        request.response = "HTTP/1.1 200 OK\r\n\r\nSmall response"
+        run1.store.add(request)
+
+        // Start new run - should preserve run1 since under 300MB threshold
+        val run2 = manager.startRun(session)
+
+        // run1 should still exist
+        assertNotNull(manager.getRun(session, run1.id))
+        // run2 should be current
+        assertEquals(run2.id, manager.getRun(session, null)?.id)
+    }
+
+    @Test
+    fun `startRun cleans up oldest runs when over size threshold`() {
+        // Set a low threshold for testing (1KB)
+        manager.cleanupThresholdBytes = 1024L
+        val session = "session-a"
+
+        // Create runs with enough data to exceed threshold
+        val run1 = manager.startConcurrentRun(session)
+        val largeResponse = "X".repeat(600)
+        val request1 = burp.Request("GET / HTTP/1.1\r\nHost: test\r\n\r\n")
+        request1.response = largeResponse
+        run1.store.add(request1)
+
+        Thread.sleep(10) // Ensure different timestamps for ordering
+
+        val run2 = manager.startConcurrentRun(session)
+        val request2 = burp.Request("GET / HTTP/1.1\r\nHost: test\r\n\r\n")
+        request2.response = largeResponse
+        run2.store.add(request2)
+
+        // Now over threshold - startRun should clean up oldest (run1)
+        val run3 = manager.startRun(session)
+
+        // run1 should be deleted (oldest)
+        assertNull(manager.getRun(session, run1.id))
+        // run2 and run3 should exist
+        assertNotNull(manager.getRun(session, run2.id))
+        assertNotNull(manager.getRun(session, run3.id))
+    }
+
+    @Test
+    fun `getTotalSizeBytes calculates size of all runs in session`() {
+        val session = "session-a"
+
+        val run = manager.startConcurrentRun(session)
+        val request = burp.Request("GET / HTTP/1.1\r\n\r\n")
+        request.response = "HTTP/1.1 200 OK\r\n\r\n"
+        run.store.add(request)
+
+        val size = manager.getTotalSizeBytes(session)
+
+        // Should be > 0 (template + response)
+        assertTrue(size > 0)
     }
 }
