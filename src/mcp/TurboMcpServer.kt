@@ -16,6 +16,9 @@ import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import mcp.resource.QueryParamAwareUriTemplateManagerFactory
+import mcp.resource.ResourceRegistry
+import mcp.resource.createResourceDefinitions
 import org.eclipse.jetty.ee10.servlet.FilterHolder
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler
 import org.eclipse.jetty.ee10.servlet.ServletHolder
@@ -55,6 +58,35 @@ class TurboMcpServer(
     private val manager = RunManager()
     val toolHandlers = McpToolHandlers(manager, organizerProvider, collaboratorProvider)
     val resourceHandlers = McpResourceHandlers(manager, organizerProvider, desyncMode)
+
+    // Resource registry with all resource definitions
+    private val resourceRegistry by lazy {
+        ResourceRegistry(ObjectMapper()).apply {
+            register(*createResourceDefinitions(resourceHandlers).toTypedArray())
+        }
+    }
+
+    /**
+     * Test helper: invoke a resource handler by URI and parse the JSON result.
+     */
+    fun invokeResourceHandler(uri: String, sessionId: String = STATELESS_SESSION_ID): Map<String, Any?> {
+        val def = resourceRegistry.findResource(uri)
+            ?: return mapOf("error" to "resource_not_found")
+        val params = def.parseParams(uri)
+        return def.handler(sessionId, params)
+    }
+
+    /** Test helper: invoke the stateless organizer list handler */
+    fun invokeStatelessOrganizerListHandler(uri: String) = invokeResourceHandler(uri)
+
+    /** Test helper: invoke the stateless organizer item handler */
+    fun invokeStatelessOrganizerItemHandler(uri: String) = invokeResourceHandler(uri)
+
+    /** Test helper: invoke the stateless run summary handler */
+    fun invokeStatelessRunSummaryHandler(uri: String) = invokeResourceHandler(uri)
+
+    /** Test helper: invoke the stateless request detail handler */
+    fun invokeStatelessRequestDetailHandler(uri: String) = invokeResourceHandler(uri)
 
     private var server: McpSyncServer? = null
     private var statelessServer: io.modelcontextprotocol.server.McpStatelessSyncServer? = null
@@ -131,13 +163,14 @@ class TurboMcpServer(
 
             statelessServer = McpServer.sync(transport)
                 .serverInfo("turbo-simulator", "1.0.0")
+                .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
                 .capabilities(McpSchema.ServerCapabilities.builder()
                     .tools(true)  // listChanged
                     .resources(true, true)  // subscribe, listChanged
                     .logging()
                     .build())
                 .tools(buildStatelessToolSpecifications())
-                .resources(buildStatelessResourceSpecifications())
+                .resources(resourceRegistry.buildStatelessSpecs())
                 .build()
         } else {
             // SSE streaming transport - supports sessions
@@ -154,13 +187,14 @@ class TurboMcpServer(
 
             server = McpServer.sync(transportProvider)
                 .serverInfo("turbo-simulator", "1.0.0")
+                .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
                 .capabilities(McpSchema.ServerCapabilities.builder()
                     .tools(true)  // listChanged
                     .resources(true, true)  // subscribe, listChanged
                     .logging()
                     .build())
                 .tools(buildToolSpecifications())
-                .resources(buildResourceSpecifications())
+                .resources(resourceRegistry.buildStatefulSpecs())
                 .build()
         }
     }
@@ -488,7 +522,7 @@ class TurboMcpServer(
     private fun buildStatelessSearchResponsesTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("search_responses")
-            .description("Search all responses in a run for a specific string. Returns IDs of requests whose responses contain the search string.")
+            .description("Search all responses in a run for a specific string. Returns IDs that can be fetched via turbo://runs/{run_id}/{id}")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -895,7 +929,7 @@ class TurboMcpServer(
     private fun buildSearchResponsesTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("search_responses")
-            .description("Search all responses in a run for a specific string. Returns IDs of requests whose responses contain the search string.")
+            .description("Search all responses in a run for a specific string. Returns IDs that can be fetched via turbo://runs/{run_id}/{id}")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -929,435 +963,6 @@ class TurboMcpServer(
             .build()
     }
 
-    // Stateless resource builders
-
-    private fun buildStatelessResourceSpecifications(): List<McpStatelessServerFeatures.SyncResourceSpecification> {
-        return listOf(
-            buildStatelessRunsListResource(),
-            buildStatelessRunStatusResourceTemplate(),
-            buildStatelessRunResultsResourceTemplate(),
-            buildStatelessRequestDetailResourceTemplate(),
-            buildStatelessOrganizerListResource(),
-            buildStatelessOrganizerItemResourceTemplate(),
-            buildStatelessDocsListResource(),
-            buildStatelessDocTopicResourceTemplate()
-        )
-    }
-
-    private fun buildStatelessRunsListResource(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs")
-            .name("List of all runs")
-            .description("List all runs with their status and result counts")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, _ ->
-            val result = resourceHandlers.listRuns(STATELESS_SESSION_ID)
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    "turbo://runs",
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessRunStatusResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}")
-            .name("Status of a specific run")
-            .description("Get detailed status of a specific run including running state, result count, and status message. Use 'current' for the most recent run.")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val runId = resourceHandlers.parseRunId(request.uri())
-            val result = resourceHandlers.getRunStatus(STATELESS_SESSION_ID, runId)
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    request.uri(),
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessRunResultsResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/summary")
-            .name("Summary from a run")
-            .description("Get paginated summary from a run. Supports query params: sort_by (id|status|length|time|wordcount), descending (true|false), limit, offset")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val uri = request.uri()
-            val runId = resourceHandlers.parseRunId(uri)
-            val params = resourceHandlers.parseQueryParams(uri)
-            val result = resourceHandlers.getResults(
-                sessionId = STATELESS_SESSION_ID,
-                runId = runId,
-                sortBy = params["sort_by"] ?: "id",
-                descending = params["descending"] != "false",
-                limit = params["limit"]?.toIntOrNull() ?: 100,
-                offset = params["offset"]?.toIntOrNull() ?: 0
-            )
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    uri,
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessRequestDetailResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/{id}")
-            .name("Details of a specific result")
-            .description("Get request and response details for a result. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val uri = request.uri()
-            val runId = resourceHandlers.parseRunId(uri)
-            val requestId = resourceHandlers.parseRequestId(uri) ?: -1
-            val params = resourceHandlers.parseQueryParams(uri)
-            val result = resourceHandlers.getRequestDetail(
-                sessionId = STATELESS_SESSION_ID,
-                runId = runId,
-                requestId = requestId,
-                bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
-                exportFile = params["export"] == "file"
-            )
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    uri,
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessOrganizerListResource(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://organizer")
-            .name("List of all Organizer items")
-            .description("List all items in Burp's Organizer with their IDs")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, _ ->
-            val result = resourceHandlers.listOrganizerItems()
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    "turbo://organizer",
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessOrganizerItemResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://organizer/{id}")
-            .name("Details of an Organizer item")
-            .description("Get the full request, response, and notes for an Organizer item by ID")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val organizerId = resourceHandlers.parseOrganizerId(request.uri())
-            val params = resourceHandlers.parseQueryParams(request.uri())
-            val bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
-            val result = if (organizerId != null) {
-                resourceHandlers.getOrganizerItem(organizerId, bodyLimit)
-            } else {
-                mapOf("error" to "invalid_organizer_id")
-            }
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    request.uri(),
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessDocsListResource(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://docs")
-            .name("Documentation topics")
-            .description("List available documentation topics for scripting reference")
-            .mimeType("application/json")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, _ ->
-            val result = resourceHandlers.listDocs()
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    "turbo://docs",
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildStatelessDocTopicResourceTemplate(): McpStatelessServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://docs/{topic}")
-            .name("Documentation for a specific topic")
-            .description("Get documentation content. Topics: api-quickstart, engines, settings, race-conditions, response-processing, decorators, misc")
-            .mimeType("text/markdown")
-            .build()
-
-        return McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val uri = request.uri()
-            val topic = resourceHandlers.parseDocTopic(uri)
-            val result = resourceHandlers.getDoc(topic ?: "")
-
-            if (result.containsKey("error")) {
-                McpSchema.ReadResourceResult(
-                    listOf(McpSchema.TextResourceContents(
-                        uri,
-                        "application/json",
-                        jsonMapper.writeValueAsString(result)
-                    ))
-                )
-            } else {
-                McpSchema.ReadResourceResult(
-                    listOf(McpSchema.TextResourceContents(
-                        uri,
-                        "text/markdown",
-                        result["content"] as String
-                    ))
-                )
-            }
-        }
-    }
-
-    private fun buildResourceSpecifications(): List<McpServerFeatures.SyncResourceSpecification> {
-        return listOf(
-            buildRunsListResource(),
-            buildRunStatusResourceTemplate(),
-            buildRunResultsResourceTemplate(),
-            buildRequestDetailResourceTemplate(),
-            buildOrganizerListResource(),
-            buildOrganizerItemResourceTemplate(),
-            buildDocsListResource(),
-            buildDocTopicResourceTemplate()
-        )
-    }
-
-    private fun buildRunsListResource(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs")
-            .name("List of all runs")
-            .description("List all runs with their status and result counts")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, _ ->
-            val result = resourceHandlers.listRuns(exchange.sessionId())
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    "turbo://runs",
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildRunStatusResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}")
-            .name("Status of a specific run")
-            .description("Get detailed status of a specific run including running state, result count, and status message. Use 'current' for the most recent run.")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
-            val runId = resourceHandlers.parseRunId(request.uri())
-            val result = resourceHandlers.getRunStatus(exchange.sessionId(), runId)
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    request.uri(),
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildRunResultsResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/summary")
-            .name("Summary from a run")
-            .description("Get paginated summary from a run. Supports query params: sort_by (id|status|length|time|wordcount), descending (true|false), limit, offset")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
-            val uri = request.uri()
-            val runId = resourceHandlers.parseRunId(uri)
-            val params = resourceHandlers.parseQueryParams(uri)
-            val result = resourceHandlers.getResults(
-                sessionId = exchange.sessionId(),
-                runId = runId,
-                sortBy = params["sort_by"] ?: "id",
-                descending = params["descending"] != "false",
-                limit = params["limit"]?.toIntOrNull() ?: 100,
-                offset = params["offset"]?.toIntOrNull() ?: 0
-            )
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    uri,
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildRequestDetailResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://runs/{run_id}/{id}")
-            .name("Details of a specific result")
-            .description("Get request and response details for a result. Supports query params: body_limit (default 100, chars of body to include), export=file (write to temp files and return paths)")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
-            val uri = request.uri()
-            val runId = resourceHandlers.parseRunId(uri)
-            val requestId = resourceHandlers.parseRequestId(uri) ?: -1
-            val params = resourceHandlers.parseQueryParams(uri)
-            val result = resourceHandlers.getRequestDetail(
-                sessionId = exchange.sessionId(),
-                runId = runId,
-                requestId = requestId,
-                bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100,
-                exportFile = params["export"] == "file"
-            )
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    uri,
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildOrganizerListResource(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://organizer")
-            .name("List of all Organizer items")
-            .description("List all items in Burp's Organizer with their IDs")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, _ ->
-            val result = resourceHandlers.listOrganizerItems()
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    "turbo://organizer",
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildOrganizerItemResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://organizer/{id}")
-            .name("Details of an Organizer item")
-            .description("Get the full request, response, and notes for an Organizer item by ID")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val organizerId = resourceHandlers.parseOrganizerId(request.uri())
-            val params = resourceHandlers.parseQueryParams(request.uri())
-            val bodyLimit = params["body_limit"]?.toIntOrNull() ?: 100
-            val result = if (organizerId != null) {
-                resourceHandlers.getOrganizerItem(organizerId, bodyLimit)
-            } else {
-                mapOf("error" to "invalid_organizer_id")
-            }
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    request.uri(),
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildDocsListResource(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://docs")
-            .name("Documentation topics")
-            .description("List available documentation topics for scripting reference")
-            .mimeType("application/json")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, _ ->
-            val result = resourceHandlers.listDocs()
-            McpSchema.ReadResourceResult(
-                listOf(McpSchema.TextResourceContents(
-                    "turbo://docs",
-                    "application/json",
-                    jsonMapper.writeValueAsString(result)
-                ))
-            )
-        }
-    }
-
-    private fun buildDocTopicResourceTemplate(): McpServerFeatures.SyncResourceSpecification {
-        val resource = McpSchema.Resource.builder()
-            .uri("turbo://docs/{topic}")
-            .name("Documentation for a specific topic")
-            .description("Get documentation content. Topics: api-quickstart, engines, settings, race-conditions, response-processing, decorators, misc")
-            .mimeType("text/markdown")
-            .build()
-
-        return McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
-            val uri = request.uri()
-            val topic = resourceHandlers.parseDocTopic(uri)
-            val result = resourceHandlers.getDoc(topic ?: "")
-
-            if (result.containsKey("error")) {
-                McpSchema.ReadResourceResult(
-                    listOf(McpSchema.TextResourceContents(
-                        uri,
-                        "application/json",
-                        jsonMapper.writeValueAsString(result)
-                    ))
-                )
-            } else {
-                McpSchema.ReadResourceResult(
-                    listOf(McpSchema.TextResourceContents(
-                        uri,
-                        "text/markdown",
-                        result["content"] as String
-                    ))
-                )
-            }
-        }
-    }
 }
 
 /**
