@@ -63,7 +63,7 @@ class McpIntegrationTest {
             baseInput = ""
         )
 
-        val result = server.resourceHandlers.handleResourceRead(testSessionId, "turbo://runs/current")
+        val result = server.invokeResourceHandler("turbo://runs/current", testSessionId)
         assertNotNull(result["run_id"])
     }
 
@@ -80,7 +80,7 @@ class McpIntegrationTest {
         )
 
         // Summary endpoint should return results array, not request_not_found error
-        val summary = server.resourceHandlers.handleResourceRead(testSessionId, "turbo://runs/current/summary")
+        val summary = server.invokeResourceHandler("turbo://runs/current/summary", testSessionId)
         assertNull(summary["error"], "Summary should not return error, got: ${summary["error"]}")
         assertNotNull(summary["results"], "Summary should contain results array")
         assertNotNull(summary["total_count"], "Summary should contain total_count")
@@ -97,7 +97,7 @@ class McpIntegrationTest {
         )
 
         // Numeric ID should route to result detail (will error if no results, but correct error)
-        val detail = server.resourceHandlers.handleResourceRead(testSessionId, "turbo://runs/current/42")
+        val detail = server.invokeResourceHandler("turbo://runs/current/42", testSessionId)
         // Should get request_not_found (correct handler, no request with ID 42)
         // NOT invalid_request_id (which would mean routing worked but parsing failed)
         assertEquals("request_not_found", detail["error"],

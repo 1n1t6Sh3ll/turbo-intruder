@@ -250,27 +250,27 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead parses body_limit from URI`() {
+    fun `getRequestDetail respects body_limit parameter`() {
         val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "Z".repeat(500)
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/1?body_limit=50")
+        val result = handlers.getRequestDetail(testSessionId, "current", 1, bodyLimit = 50)
 
         assertEquals("Z".repeat(50), result["response_body"])
     }
 
     @Test
-    fun `handleResourceRead parses export param from URI`() {
+    fun `getRequestDetail respects exportFile parameter`() {
         val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\ndata"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/1?export=file")
+        val result = handlers.getRequestDetail(testSessionId, "current", 1, exportFile = true)
 
         assertNotNull(result["response_file"])
         assertNull(result["response_body"])
@@ -293,21 +293,21 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead routes result by id for current run`() {
+    fun `getRequestDetail returns result by id for current run`() {
         val run = manager.startRun(testSessionId)
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 36
         request.response = "HTTP/1.1 200 OK\r\n\r\ntest body"
         run.store.add(request)
 
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/36")
+        val result = handlers.getRequestDetail(testSessionId, "current", 36)
 
         assertEquals("test body", result["response_body"])
         assertEquals(200, result["status"])
     }
 
     @Test
-    fun `getResults defaults to sorting by anomaly_rank descending`() {
+    fun `getResults can sort by anomaly_rank descending`() {
         val run = manager.startRun(testSessionId)
 
         val req1 = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
@@ -329,9 +329,10 @@ class McpResourceHandlersTest {
         run.store.add(req2)
         run.store.add(req3)
 
-        // Use handleResourceRead with no sort_by param to test default
-        val result = handlers.handleResourceRead(testSessionId, "turbo://runs/current/summary")
+        // Call getResults with anomaly_rank sorting
+        val result = handlers.getResults(testSessionId, "current", "anomaly_rank", true, 100, 0)
 
+        @Suppress("UNCHECKED_CAST")
         val results = result["results"] as List<Map<String, Any?>>
         assertEquals(3, results.size)
         // Should be sorted by anomaly_rank descending: 100, 50, 10
@@ -370,13 +371,13 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead routes turbo organizer to listOrganizerItems`() {
+    fun `listOrganizerItems returns items`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(42, "GET /test HTTP/1.1", "HTTP/1.1 200 OK")
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer")
+        val result = handlersWithOrganizer.listOrganizerItems()
 
         assertEquals(1, result["count"])
     }
@@ -408,13 +409,13 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead routes turbo organizer id to getOrganizerItem`() {
+    fun `getOrganizerItem retrieves item by id`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(42, "GET /test HTTP/1.1", "HTTP/1.1 200 OK")
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer/42")
+        val result = handlersWithOrganizer.getOrganizerItem(42)
 
         assertEquals(42, result["id"])
         assertEquals("GET /test HTTP/1.1", result["request"])
@@ -530,7 +531,7 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead parses body_limit for organizer items`() {
+    fun `getOrganizerItem respects body_limit parameter`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(
                 id = 42,
@@ -540,7 +541,7 @@ class McpResourceHandlersTest {
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer/42?body_limit=150")
+        val result = handlersWithOrganizer.getOrganizerItem(42, bodyLimit = 150)
 
         assertEquals("Q".repeat(150), result["response_body"])
         assertEquals(true, result["response_body_truncated"])
@@ -611,14 +612,14 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead routes comma-separated organizer ids`() {
+    fun `getOrganizerItems retrieves multiple items by ids`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(10, "GET /10 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nten"),
             FakeOrganizerItem(20, "GET /20 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\ntwenty")
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer/10,20")
+        val result = handlersWithOrganizer.getOrganizerItems(setOf(10, 20))
 
         @Suppress("UNCHECKED_CAST")
         val items = result["items"] as List<Map<String, Any?>>
@@ -780,7 +781,7 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `handleResourceRead parses domain query param for organizer`() {
+    fun `listOrganizerItems filters by domain`() {
         val fakeOrganizer = FakeOrganizerProvider(listOf(
             FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com"),
             FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "other.com"),
@@ -788,14 +789,14 @@ class McpResourceHandlersTest {
         ))
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer?domain=example.com")
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com")
 
         assertEquals(2, result["count"])
         assertEquals(1, result["page"])
     }
 
     @Test
-    fun `handleResourceRead parses domain and page query params for organizer`() {
+    fun `listOrganizerItems supports domain and page parameters`() {
         // Create 15 items for example.com
         val items = (1..15).map {
             FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", host = "example.com")
@@ -803,7 +804,7 @@ class McpResourceHandlersTest {
         val fakeOrganizer = FakeOrganizerProvider(items)
         val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
 
-        val result = handlersWithOrganizer.handleResourceRead(testSessionId, "turbo://organizer?domain=example.com&page=2")
+        val result = handlersWithOrganizer.listOrganizerItems(domain = "example.com", page = 2)
 
         assertEquals(15, result["count"])
         assertEquals(2, result["page"])

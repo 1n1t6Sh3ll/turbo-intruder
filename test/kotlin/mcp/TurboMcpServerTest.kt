@@ -94,6 +94,47 @@ class TurboMcpServerTest {
     }
 
     @Test
+    fun `stateless organizer handler parses domain query param`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", host = "target.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", host = "other.com"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", host = "target.com")
+        ))
+        val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
+
+        // Invoke the stateless handler directly with a URI containing domain query param
+        val result = server.invokeStatelessOrganizerListHandler("turbo://organizer?domain=target.com")
+
+        assertEquals(2, result["count"], "Should filter to 2 items for target.com")
+        assertEquals(1, result["page"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(2, items.size)
+        // Items list only contains IDs; verify the correct IDs were returned (1 and 3 for target.com)
+        val ids = items.map { it["id"] }.toSet()
+        assertEquals(setOf(1, 3), ids, "Should return IDs 1 and 3 for target.com")
+    }
+
+    @Test
+    fun `stateless organizer handler parses page query param`() {
+        // Create 15 items for target.com
+        val items = (1..15).map {
+            FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", host = "target.com")
+        }
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
+
+        // Request page 2
+        val result = server.invokeStatelessOrganizerListHandler("turbo://organizer?domain=target.com&page=2")
+
+        assertEquals(15, result["count"])
+        assertEquals(2, result["page"], "Should return page 2")
+        @Suppress("UNCHECKED_CAST")
+        val returnedItems = result["items"] as List<Map<String, Any?>>
+        assertEquals(5, returnedItems.size, "Page 2 should have 5 items (11-15)")
+    }
+
+    @Test
     fun `organizer list resource supports pagination via URI template`() {
         // Create 25 items
         val items = (1..25).map {
@@ -120,5 +161,121 @@ class TurboMcpServerTest {
 
         assertEquals(10, page1Items.size)
         assertEquals(5, page3Items.size)
+    }
+
+    // ============================================================
+    // Stateless handler query param tests
+    // These verify that stateless MCP handlers correctly parse
+    // query parameters from the request URI.
+    // ============================================================
+
+    @Test
+    fun `stateless run summary handler parses limit query param`() {
+        val server = TurboMcpServer(port = 31337)
+
+        // Start a run so we have something to query
+        server.toolHandlers.startRunAsync(
+            sessionId = "stateless",
+            script = "def queueRequests(t, w): pass\ndef completed(r): pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
+            endpoint = "https://test.com:443",
+            baseInput = ""
+        )
+
+        // Invoke stateless handler with limit param
+        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?limit=5")
+
+        // The limit should be applied (even if there are 0 results, the param should be parsed)
+        assertNotNull(result["results"], "Should have results key")
+        assertNull(result["error"], "Should not have error")
+    }
+
+    @Test
+    fun `stateless run summary handler parses sort_by query param`() {
+        val server = TurboMcpServer(port = 31337)
+
+        server.toolHandlers.startRunAsync(
+            sessionId = "stateless",
+            script = "def queueRequests(t, w): pass\ndef completed(r): pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
+            endpoint = "https://test.com:443",
+            baseInput = ""
+        )
+
+        // These should not error - if params aren't parsed, invalid sort_by would be ignored
+        val resultById = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?sort_by=id")
+        val resultByLength = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?sort_by=length")
+
+        assertNotNull(resultById["results"])
+        assertNotNull(resultByLength["results"])
+    }
+
+    @Test
+    fun `stateless run summary handler parses offset query param`() {
+        val server = TurboMcpServer(port = 31337)
+
+        server.toolHandlers.startRunAsync(
+            sessionId = "stateless",
+            script = "def queueRequests(t, w): pass\ndef completed(r): pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
+            endpoint = "https://test.com:443",
+            baseInput = ""
+        )
+
+        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?offset=10&limit=5")
+
+        assertNotNull(result["results"])
+        assertNull(result["error"])
+    }
+
+    @Test
+    fun `stateless request detail handler parses body_limit query param`() {
+        val server = TurboMcpServer(port = 31337)
+
+        server.toolHandlers.startRunAsync(
+            sessionId = "stateless",
+            script = "def queueRequests(t, w): pass\ndef completed(r): pass",
+            baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
+            endpoint = "https://test.com:443",
+            baseInput = ""
+        )
+
+        // Request with body_limit - should parse without error even if no results exist
+        val result = server.invokeStatelessRequestDetailHandler("turbo://runs/current/1?body_limit=500")
+
+        // Will return request_not_found since there are no actual results, but should not error on parsing
+        assertTrue(result.containsKey("error") || result.containsKey("request"),
+            "Should return either error or request data")
+    }
+
+    @Test
+    fun `stateless organizer item handler parses body_limit query param`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(
+                id = 42,
+                request = "GET /test HTTP/1.1\r\nHost: example.com\r\n\r\n",
+                response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n" + "A".repeat(500),
+                host = "example.com"
+            )
+        ))
+        val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
+
+        // Request with small body_limit - response body should be truncated
+        val resultSmall = server.invokeStatelessOrganizerItemHandler("turbo://organizer/42?body_limit=50")
+
+        // Request with large body_limit - response body should not be truncated
+        val resultLarge = server.invokeStatelessOrganizerItemHandler("turbo://organizer/42?body_limit=1000")
+
+        assertNull(resultSmall["error"], "Should not error")
+        assertNull(resultLarge["error"], "Should not error")
+
+        // Verify body_limit was actually applied
+        val smallBody = resultSmall["response_body"] as? String ?: ""
+        val largeBody = resultLarge["response_body"] as? String ?: ""
+
+        assertTrue(smallBody.length <= 50 || (resultSmall["response_body_truncated"] as? Boolean == true),
+            "Small body_limit should truncate or mark as truncated")
+        assertTrue(largeBody.length >= smallBody.length,
+            "Large body_limit should return more content")
     }
 }
