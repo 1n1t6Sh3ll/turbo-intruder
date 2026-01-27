@@ -14,13 +14,14 @@ class RunManager {
     var currentRun: ActiveRun? = null
         private set
 
-    // Size threshold for cleanup (default 300MB)
+    // Auto-cleanup disabled for now
+    private val autoCleanupEnabled = false
     var cleanupThresholdBytes: Long = 300L * 1024 * 1024
 
     // Session-aware methods
 
     fun startRun(sessionId: String): ActiveRun {
-        cleanupIfOverThreshold(sessionId)
+        if (autoCleanupEnabled) cleanupIfOverThreshold(sessionId)
         val run = ActiveRun(sessionId)
         runs[run.id] = run
         currentRunBySession[sessionId] = run.id
@@ -116,7 +117,7 @@ class RunManager {
     // Legacy session-less methods for backward compatibility
 
     fun startRun(): ActiveRun {
-        cleanupIfOverThreshold("legacy")
+        if (autoCleanupEnabled) cleanupIfOverThreshold("legacy")
         val run = ActiveRun("legacy")
         runs[run.id] = run
         currentRun = run

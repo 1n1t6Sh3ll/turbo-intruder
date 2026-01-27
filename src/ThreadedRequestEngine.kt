@@ -627,8 +627,8 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
         // Clean up thread-specific resources first
         domains.clear()
 
-        // Interrupt and clean up threads
-        for (thread in threadPool) {
+        // Interrupt and clean up threads (copy to avoid ConcurrentModificationException)
+        for (thread in threadPool.toList()) {
             try {
                 if (thread.isAlive) {
                     thread.interrupt()
