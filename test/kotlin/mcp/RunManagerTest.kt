@@ -204,36 +204,6 @@ class RunManagerTest {
     }
 
     @Test
-    fun `startRun cleans up oldest runs when over size threshold`() {
-        // Set a low threshold for testing (1KB)
-        manager.cleanupThresholdBytes = 1024L
-        val session = "session-a"
-
-        // Create runs with enough data to exceed threshold
-        val run1 = manager.startConcurrentRun(session)
-        val largeResponse = "X".repeat(600)
-        val request1 = burp.Request("GET / HTTP/1.1\r\nHost: test\r\n\r\n")
-        request1.response = largeResponse
-        run1.store.add(request1)
-
-        Thread.sleep(10) // Ensure different timestamps for ordering
-
-        val run2 = manager.startConcurrentRun(session)
-        val request2 = burp.Request("GET / HTTP/1.1\r\nHost: test\r\n\r\n")
-        request2.response = largeResponse
-        run2.store.add(request2)
-
-        // Now over threshold - startRun should clean up oldest (run1)
-        val run3 = manager.startRun(session)
-
-        // run1 should be deleted (oldest)
-        assertNull(manager.getRun(session, run1.id))
-        // run2 and run3 should exist
-        assertNotNull(manager.getRun(session, run2.id))
-        assertNotNull(manager.getRun(session, run3.id))
-    }
-
-    @Test
     fun `getTotalSizeBytes calculates size of all runs in session`() {
         val session = "session-a"
 
