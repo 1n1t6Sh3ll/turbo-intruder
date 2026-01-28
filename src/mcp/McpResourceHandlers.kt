@@ -250,18 +250,6 @@ class McpResourceHandlers(
 
     // Documentation resources
 
-    fun listDocs(): Map<String, Any> {
-        return mapOf(
-            "topics" to docTopics.map { (name, description) ->
-                mapOf(
-                    "name" to name,
-                    "uri" to "turbo://docs/$name",
-                    "description" to description
-                )
-            }
-        )
-    }
-
     fun getDoc(topic: String): Map<String, Any?> {
         if (!docTopics.containsKey(topic)) {
             return mapOf("error" to "unknown_topic", "available_topics" to docTopics.keys.toList())

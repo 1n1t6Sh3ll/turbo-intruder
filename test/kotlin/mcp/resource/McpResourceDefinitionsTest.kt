@@ -23,8 +23,13 @@ class McpResourceDefinitionsTest {
         assertTrue(uris.contains("turbo://runs/{run_id}/{id}"))
         assertTrue(uris.contains("turbo://organizer"))
         assertTrue(uris.contains("turbo://organizer/{id}"))
-        assertTrue(uris.contains("turbo://docs"))
-        assertTrue(uris.contains("turbo://docs/{topic}"))
+        assertTrue(uris.contains("turbo://docs/api-quickstart"))
+        assertTrue(uris.contains("turbo://docs/engines"))
+        assertTrue(uris.contains("turbo://docs/settings"))
+        assertTrue(uris.contains("turbo://docs/race-conditions"))
+        assertTrue(uris.contains("turbo://docs/response-processing"))
+        assertTrue(uris.contains("turbo://docs/decorators"))
+        assertTrue(uris.contains("turbo://docs/misc"))
     }
 
     @Test
@@ -115,13 +120,15 @@ class McpResourceDefinitionsTest {
     }
 
     @Test
-    fun `docs topic definition has markdown mime type`() {
+    fun `docs definitions have markdown mime type`() {
         val definitions = createResourceDefinitions(handlers)
-        val def = definitions.find { it.uriPattern == "turbo://docs/{topic}" }!!
+        val docDefs = definitions.filter { it.uriPattern.startsWith("turbo://docs/") }
 
-        assertEquals("text/markdown", def.mimeType)
-        assertEquals(1, def.pathParams.size)
-        assertEquals("topic", def.pathParams[0].name)
+        assertEquals(7, docDefs.size)
+        docDefs.forEach { def ->
+            assertEquals("text/markdown", def.mimeType)
+            assertTrue(def.pathParams.isEmpty(), "Doc resources should not have path params")
+        }
     }
 
     @Test

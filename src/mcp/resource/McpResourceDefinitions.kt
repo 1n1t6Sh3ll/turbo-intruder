@@ -103,20 +103,52 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
 
     // === Documentation Resources ===
 
-    resource("turbo://docs") {
-        name = "Documentation topics"
-        description = "List available documentation topics for scripting reference"
-        handle { _, _ ->
-            handlers.listDocs()
-        }
+    resource("turbo://docs/api-quickstart") {
+        name = "API Quickstart"
+        description = "Quick reference for scripting"
+        mimeType = "text/markdown"
+        handle { _, _ -> handlers.getDoc("api-quickstart") }
     },
 
-    resource("turbo://docs/{topic}") {
-        name = "Documentation for a specific topic"
-        description = "Get documentation content. Topics: api-quickstart, engines, settings, race-conditions, response-processing, decorators, misc"
+    resource("turbo://docs/engines") {
+        name = "Engine Types"
+        description = "Engine types (THREADED, BURP, BURP2)"
         mimeType = "text/markdown"
-        handle { _, params ->
-            handlers.getDoc(params.path("topic"))
-        }
+        handle { _, _ -> handlers.getDoc("engines") }
+    },
+
+    resource("turbo://docs/settings") {
+        name = "Settings Reference"
+        description = "Complete parameter reference"
+        mimeType = "text/markdown"
+        handle { _, _ -> handlers.getDoc("settings") }
+    },
+
+    resource("turbo://docs/race-conditions") {
+        name = "Race Conditions"
+        description = "Race condition testing with gates"
+        mimeType = "text/markdown"
+        handle { _, _ -> handlers.getDoc("race-conditions") }
+    },
+
+    resource("turbo://docs/response-processing") {
+        name = "Response Processing"
+        description = "Handling and filtering responses"
+        mimeType = "text/markdown"
+        handle { _, _ -> handlers.getDoc("response-processing") }
+    },
+
+    resource("turbo://docs/decorators") {
+        name = "Decorators"
+        description = "Response decorator reference"
+        mimeType = "text/markdown"
+        handle { _, _ -> handlers.getDoc("decorators") }
+    },
+
+    resource("turbo://docs/misc") {
+        name = "Misc Utilities"
+        description = "Wordlists and utilities"
+        mimeType = "text/markdown"
+        handle { _, _ -> handlers.getDoc("misc") }
     }
 )
