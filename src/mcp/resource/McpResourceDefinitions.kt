@@ -81,10 +81,16 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         description = "List all items in Burp's Organizer with their IDs"
         queryString("domain", description = "filter by host")
         queryInt("page", default = 1)
+        queryString("searchNotes", description = "filter by notes content (case-insensitive)")
+        queryString("searchRequest", description = "filter by request content (case-insensitive)")
+        queryString("searchResponse", description = "filter by response content (case-insensitive)")
         handle { _, params ->
             handlers.listOrganizerItems(
                 domain = params.string("domain"),
-                page = params.int("page")!!
+                page = params.int("page")!!,
+                searchNotes = params.string("searchNotes"),
+                searchRequest = params.string("searchRequest"),
+                searchResponse = params.string("searchResponse")
             )
         }
     },

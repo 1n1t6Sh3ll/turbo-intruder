@@ -108,6 +108,17 @@ class McpResourceDefinitionsTest {
     }
 
     @Test
+    fun `organizer list definition has search params`() {
+        val definitions = createResourceDefinitions(handlers)
+        val def = definitions.find { it.uriPattern == "turbo://organizer" }!!
+
+        val paramNames = def.queryParams.map { it.name }.toSet()
+        assertTrue(paramNames.contains("searchNotes"))
+        assertTrue(paramNames.contains("searchRequest"))
+        assertTrue(paramNames.contains("searchResponse"))
+    }
+
+    @Test
     fun `organizer item definition has body_limit param`() {
         val definitions = createResourceDefinitions(handlers)
         val def = definitions.find { it.uriPattern == "turbo://organizer/{id}" }!!

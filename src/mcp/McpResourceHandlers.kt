@@ -172,16 +172,36 @@ class McpResourceHandlers(
 
     // Organizer resources
 
-    fun listOrganizerItems(domain: String? = null, page: Int = 1): Map<String, Any> {
+    fun listOrganizerItems(
+        domain: String? = null,
+        page: Int = 1,
+        searchNotes: String? = null,
+        searchRequest: String? = null,
+        searchResponse: String? = null
+    ): Map<String, Any> {
         val allItems = organizerProvider?.getItems() ?: emptyList()
-        val filteredItems = if (domain != null) {
-            allItems.filter { it.host == domain }
-        } else {
-            allItems
+        var filteredItems = allItems
+
+        // Apply domain filter
+        if (domain != null) {
+            filteredItems = filteredItems.filter { it.host == domain }
         }
 
+        // Apply search filters (case-insensitive)
+        if (searchNotes != null) {
+            filteredItems = filteredItems.filter { it.notes.contains(searchNotes, ignoreCase = true) }
+        }
+        if (searchRequest != null) {
+            filteredItems = filteredItems.filter { it.request.contains(searchRequest, ignoreCase = true) }
+        }
+        if (searchResponse != null) {
+            filteredItems = filteredItems.filter { it.response.contains(searchResponse, ignoreCase = true) }
+        }
+
+        val hasFilters = domain != null || searchNotes != null || searchRequest != null || searchResponse != null
+
         // Apply sorting and pagination only when filtering
-        return if (domain != null) {
+        return if (hasFilters) {
             // Sort by timestamp descending (nulls last), then by ID descending as tiebreaker
             val sortedItems = filteredItems.sortedWith(
                 compareByDescending<OrganizerItemData> { it.timeRequestSent }

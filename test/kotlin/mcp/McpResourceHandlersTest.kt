@@ -861,4 +861,127 @@ class McpResourceHandlersTest {
         val items = result["items"] as List<Map<String, Any?>>
         assertEquals(listOf(2), items.map { it["id"] })
     }
+
+    // Search parameter tests
+
+    @Test
+    fun `listOrganizerItems with searchNotes returns only items with matching notes`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", notes = "important finding"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", notes = "nothing here"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", notes = "another important item")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(searchNotes = "important")
+
+        assertEquals(2, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(setOf(1, 3), items.map { it["id"] }.toSet())
+    }
+
+    @Test
+    fun `listOrganizerItems with searchRequest returns only items with matching request`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /api/users HTTP/1.1\r\nHost: example.com", "HTTP/1.1 200 OK"),
+            FakeOrganizerItem(2, "POST /api/login HTTP/1.1\r\nHost: example.com", "HTTP/1.1 200 OK"),
+            FakeOrganizerItem(3, "GET /api/users/123 HTTP/1.1\r\nHost: example.com", "HTTP/1.1 200 OK")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(searchRequest = "/api/users")
+
+        assertEquals(2, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(setOf(1, 3), items.map { it["id"] }.toSet())
+    }
+
+    @Test
+    fun `listOrganizerItems with searchResponse returns only items with matching response`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\n{\"error\": \"not found\"}"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\n{\"success\": true}"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 500 Error\r\n\r\n{\"error\": \"server error\"}")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(searchResponse = "error")
+
+        assertEquals(2, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(setOf(1, 3), items.map { it["id"] }.toSet())
+    }
+
+    @Test
+    fun `listOrganizerItems search is case-insensitive`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", notes = "IMPORTANT"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", notes = "important"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", notes = "nothing")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(searchNotes = "Important")
+
+        assertEquals(2, result["count"])
+    }
+
+    @Test
+    fun `listOrganizerItems combines search filters with AND`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /api HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nsecret", notes = "important"),
+            FakeOrganizerItem(2, "POST /api HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\npublic", notes = "important"),
+            FakeOrganizerItem(3, "GET /api HTTP/1.1", "HTTP/1.1 200 OK\r\n\r\nsecret", notes = "trivial")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(
+            searchNotes = "important",
+            searchResponse = "secret"
+        )
+
+        assertEquals(1, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(listOf(1), items.map { it["id"] })
+    }
+
+    @Test
+    fun `listOrganizerItems combines search with domain filter`() {
+        val fakeOrganizer = FakeOrganizerProvider(listOf(
+            FakeOrganizerItem(1, "GET /1 HTTP/1.1", "HTTP/1.1 200 OK", notes = "important", host = "example.com"),
+            FakeOrganizerItem(2, "GET /2 HTTP/1.1", "HTTP/1.1 200 OK", notes = "important", host = "other.com"),
+            FakeOrganizerItem(3, "GET /3 HTTP/1.1", "HTTP/1.1 200 OK", notes = "nothing", host = "example.com")
+        ))
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(
+            domain = "example.com",
+            searchNotes = "important"
+        )
+
+        assertEquals(1, result["count"])
+        @Suppress("UNCHECKED_CAST")
+        val items = result["items"] as List<Map<String, Any?>>
+        assertEquals(listOf(1), items.map { it["id"] })
+    }
+
+    @Test
+    fun `listOrganizerItems with search enables pagination`() {
+        val items = (1..15).map {
+            FakeOrganizerItem(it, "GET /$it HTTP/1.1", "HTTP/1.1 200 OK", notes = "match")
+        }
+        val fakeOrganizer = FakeOrganizerProvider(items)
+        val handlersWithOrganizer = McpResourceHandlers(manager, fakeOrganizer)
+
+        val result = handlersWithOrganizer.listOrganizerItems(searchNotes = "match")
+
+        assertEquals(15, result["count"])
+        assertEquals(1, result["page"])
+        assertEquals(10, result["page_size"])
+        assertEquals(2, result["total_pages"])
+    }
 }
