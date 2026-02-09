@@ -156,5 +156,20 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         description = "Wordlists and utilities"
         mimeType = "text/markdown"
         handle { _, _ -> handlers.getDoc("misc") }
+    },
+
+    // === Example Script Resources ===
+
+    resource("turbo://examples") {
+        name = "Example Scripts"
+        description = "List all available example scripts"
+        handle { _, _ -> handlers.listExamples() }
+    },
+
+    resource("turbo://examples/{name}") {
+        name = "Example Script"
+        description = "Get the content of an example script by name"
+        mimeType = "text/x-python"
+        handle { _, params -> handlers.getExample(params.path("name")) }
     }
 )

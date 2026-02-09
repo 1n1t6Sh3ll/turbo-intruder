@@ -984,4 +984,61 @@ class McpResourceHandlersTest {
         assertEquals(10, result["page_size"])
         assertEquals(2, result["total_pages"])
     }
+
+    // Example script resource tests
+
+    @Test
+    fun `listExamples returns list of available example scripts`() {
+        val result = handlers.listExamples()
+
+        @Suppress("UNCHECKED_CAST")
+        val examples = result["examples"] as List<Map<String, Any?>>
+        assertTrue(examples.isNotEmpty())
+        // Check that basic.py is in the list
+        assertTrue(examples.any { it["name"] == "basic" })
+    }
+
+    @Test
+    fun `listExamples returns name for each example`() {
+        val result = handlers.listExamples()
+
+        @Suppress("UNCHECKED_CAST")
+        val examples = result["examples"] as List<Map<String, Any?>>
+        val basic = examples.find { it["name"] == "basic" }
+        assertNotNull(basic)
+    }
+
+    @Test
+    fun `getExample returns script content for valid example`() {
+        val result = handlers.getExample("basic")
+
+        assertNotNull(result["content"])
+        val content = result["content"] as String
+        assertTrue(content.contains("def queueRequests"))
+    }
+
+    @Test
+    fun `getExample returns error for unknown example`() {
+        val result = handlers.getExample("nonexistent-script")
+
+        assertEquals("not_found", result["error"])
+    }
+
+    @Test
+    fun `listExamples auto-discovers all py files in examples directory`() {
+        val result = handlers.listExamples()
+
+        @Suppress("UNCHECKED_CAST")
+        val examples = result["examples"] as List<Map<String, Any?>>
+        val names = examples.map { it["name"] }
+
+        // These are actual files in resources/examples/ - includes ones NOT in any hardcoded list
+        assertTrue(names.contains("basic"), "Should discover basic.py")
+        assertTrue(names.contains("timing"), "Should discover timing.py")
+        assertTrue(names.contains("customSortOrder"), "Should discover customSortOrder.py")
+        assertTrue(names.contains("pinwheel"), "Should discover pinwheel.py")
+        assertTrue(names.contains("email-link-extraction"), "Should discover email-link-extraction.py")
+        // Should NOT include __init__.py
+        assertFalse(names.contains("__init__"), "Should not include __init__.py")
+    }
 }

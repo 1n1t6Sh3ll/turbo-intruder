@@ -20,6 +20,43 @@ class McpResourceHandlers(
         "misc" to "Wordlists and utilities"
     )
 
+    // Auto-discovered from resources/examples/
+    private val discoveredExamples: Set<String> by lazy { discoverExamples() }
+
+    private fun discoverExamples(): Set<String> {
+        val examples = mutableSetOf<String>()
+
+        // Try classpath resources first (when running as jar)
+        // The examples directory is added as a resource root
+        javaClass.getResourceAsStream("/examples/")?.use { stream ->
+            stream.bufferedReader().readLines()
+                .filter { it.endsWith(".py") && it != "__init__.py" }
+                .map { it.removeSuffix(".py") }
+                .forEach { examples.add(it) }
+        }
+
+        // Fall back to file system (for development)
+        if (examples.isEmpty()) {
+            val possiblePaths = listOf(
+                "resources/examples",
+                "../resources/examples",
+                "../../resources/examples"
+            )
+            for (path in possiblePaths) {
+                val dir = File(path)
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()
+                        ?.filter { it.extension == "py" && it.name != "__init__.py" }
+                        ?.map { it.nameWithoutExtension }
+                        ?.forEach { examples.add(it) }
+                    break
+                }
+            }
+        }
+
+        return examples
+    }
+
     fun listRuns(sessionId: String): Map<String, Any> {
         val runs = manager.getAllRuns(sessionId).map { run ->
             mapOf(
@@ -297,6 +334,54 @@ class McpResourceHandlers(
             "docs/$topic.md",
             "../docs/$topic.md",
             "../../docs/$topic.md"
+        )
+
+        for (path in possiblePaths) {
+            val file = File(path)
+            if (file.exists()) {
+                return file.readText()
+            }
+        }
+
+        return null
+    }
+
+    // Example script resources
+
+    fun listExamples(): Map<String, Any> {
+        return mapOf(
+            "examples" to discoveredExamples.sorted().map { name ->
+                mapOf("name" to name)
+            }
+        )
+    }
+
+    fun getExample(name: String): Map<String, Any?> {
+        if (!discoveredExamples.contains(name)) {
+            return mapOf("error" to "not_found", "available_examples" to discoveredExamples.sorted())
+        }
+
+        val content = loadExampleContent(name)
+            ?: return mapOf("error" to "not_found")
+
+        return mapOf(
+            "name" to name,
+            "content" to content
+        )
+    }
+
+    private fun loadExampleContent(name: String): String? {
+        // Try loading from classpath resources first (when running as jar)
+        val resourcePath = "/examples/$name.py"
+        javaClass.getResourceAsStream(resourcePath)?.use { stream ->
+            return stream.bufferedReader().readText()
+        }
+
+        // Fall back to file system (for development)
+        val possiblePaths = listOf(
+            "resources/examples/$name.py",
+            "../resources/examples/$name.py",
+            "../../resources/examples/$name.py"
         )
 
         for (path in possiblePaths) {

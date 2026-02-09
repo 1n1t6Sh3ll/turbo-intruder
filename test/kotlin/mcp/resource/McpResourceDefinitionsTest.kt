@@ -168,4 +168,26 @@ class McpResourceDefinitionsTest {
         assertEquals(true, params.bool("descending"))
         assertEquals(0, params.int("offset"))
     }
+
+    // Example script resource tests
+
+    @Test
+    fun `examples list definition exists`() {
+        val definitions = createResourceDefinitions(handlers)
+        val def = definitions.find { it.uriPattern == "turbo://examples" }
+
+        assertNotNull(def, "turbo://examples should exist")
+        assertEquals("Example Scripts", def!!.name)
+    }
+
+    @Test
+    fun `example detail definition exists with name param`() {
+        val definitions = createResourceDefinitions(handlers)
+        val def = definitions.find { it.uriPattern == "turbo://examples/{name}" }
+
+        assertNotNull(def, "turbo://examples/{name} should exist")
+        assertEquals(1, def!!.pathParams.size)
+        assertEquals("name", def.pathParams[0].name)
+        assertEquals("text/x-python", def.mimeType)
+    }
 }
