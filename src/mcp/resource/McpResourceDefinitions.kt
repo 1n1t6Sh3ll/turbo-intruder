@@ -6,19 +6,11 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
 
     // === Run Resources ===
 
-    resource("turbo://runs") {
-        name = "List of all runs"
-        description = "List all runs with their status and result counts"
-        handle { sessionId, _ ->
-            handlers.listRuns(sessionId)
-        }
-    },
-
     resource("turbo://runs/{run_id}") {
         name = "Status of a specific run"
-        description = "Get detailed status of a specific run including running state, result count, and status message. Use 'current' for the most recent run"
-        handle { sessionId, params ->
-            handlers.getRunStatus(sessionId, params.path("run_id"))
+        description = "Get detailed status of a specific run including running state, result count, and status message"
+        handle { params ->
+            handlers.getRunStatus(params.path("run_id"))
         }
     },
 
@@ -29,9 +21,8 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         queryBool("descending", default = true)
         queryInt("limit", default = 100)
         queryInt("offset", default = 0)
-        handle { sessionId, params ->
+        handle { params ->
             handlers.getResults(
-                sessionId = sessionId,
                 runId = params.path("run_id"),
                 sortBy = params.string("sort_by")!!,
                 descending = params.bool("descending")!!,
@@ -46,9 +37,8 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         description = "Get full HTTP request/response for result {id} from run {run_id}. Example: turbo://runs/abc123/42"
         queryInt("body_limit", default = 100, description = "chars of body to include")
         queryString("export", description = "set to 'file' to write to temp files")
-        handle { sessionId, params ->
+        handle { params ->
             handlers.getRequestDetail(
-                sessionId = sessionId,
                 runId = params.path("run_id"),
                 requestId = params.path("id").toInt(),
                 bodyLimit = params.int("body_limit")!!,
@@ -63,9 +53,8 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         description = "Alias for turbo://runs/{run_id}/{id} - prefer the shorter form"
         queryInt("body_limit", default = 100, description = "chars of body to include")
         queryString("export", description = "set to 'file' to write to temp files")
-        handle { sessionId, params ->
+        handle { params ->
             handlers.getRequestDetail(
-                sessionId = sessionId,
                 runId = params.path("run_id"),
                 requestId = params.path("id").toInt(),
                 bodyLimit = params.int("body_limit")!!,
@@ -84,7 +73,7 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         queryString("searchNotes", description = "filter by notes content (case-insensitive)")
         queryString("searchRequest", description = "filter by request content (case-insensitive)")
         queryString("searchResponse", description = "filter by response content (case-insensitive)")
-        handle { _, params ->
+        handle { params ->
             handlers.listOrganizerItems(
                 domain = params.string("domain"),
                 page = params.int("page")!!,
@@ -99,7 +88,7 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         name = "Organizer entry by numeric ID"
         description = "Get full request, response, and notes for an Organizer entry. Example: turbo://organizer/42"
         queryInt("body_limit", default = 100)
-        handle { _, params ->
+        handle { params ->
             handlers.getOrganizerItem(
                 id = params.path("id").toInt(),
                 bodyLimit = params.int("body_limit")!!
@@ -113,49 +102,49 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         name = "API Quickstart"
         description = "Quick reference for scripting"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("api-quickstart") }
+        handle { handlers.getDoc("api-quickstart") }
     },
 
     resource("turbo://docs/engines") {
         name = "Engine Types"
         description = "Engine types (THREADED, BURP, BURP2)"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("engines") }
+        handle { handlers.getDoc("engines") }
     },
 
     resource("turbo://docs/settings") {
         name = "Settings Reference"
         description = "Complete parameter reference"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("settings") }
+        handle { handlers.getDoc("settings") }
     },
 
     resource("turbo://docs/race-conditions") {
         name = "Race Conditions"
         description = "Race condition testing with gates"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("race-conditions") }
+        handle { handlers.getDoc("race-conditions") }
     },
 
     resource("turbo://docs/response-processing") {
         name = "Response Processing"
         description = "Handling and filtering responses"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("response-processing") }
+        handle { handlers.getDoc("response-processing") }
     },
 
     resource("turbo://docs/decorators") {
         name = "Decorators"
         description = "Response decorator reference"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("decorators") }
+        handle { handlers.getDoc("decorators") }
     },
 
     resource("turbo://docs/misc") {
         name = "Misc Utilities"
         description = "Wordlists and utilities"
         mimeType = "text/markdown"
-        handle { _, _ -> handlers.getDoc("misc") }
+        handle { handlers.getDoc("misc") }
     },
 
     // === Example Script Resources ===
@@ -163,13 +152,13 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
     resource("turbo://examples") {
         name = "Example Scripts"
         description = "List all available example scripts"
-        handle { _, _ -> handlers.listExamples() }
+        handle { handlers.listExamples() }
     },
 
     resource("turbo://examples/{name}") {
         name = "Example Script"
         description = "Get the content of an example script by name"
         mimeType = "text/x-python"
-        handle { _, params -> handlers.getExample(params.path("name")) }
+        handle { params -> handlers.getExample(params.path("name")) }
     }
 )

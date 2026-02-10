@@ -11,7 +11,7 @@ class ResourceBuilder(private val uriPattern: String) {
 
     private val pathParams = mutableListOf<ResourceParam.PathParam>()
     private val queryParams = mutableListOf<ResourceParam.QueryParam<*>>()
-    private var handlerFn: ((String, ParsedParams) -> Map<String, Any?>)? = null
+    private var handlerFn: ((ParsedParams) -> Map<String, Any?>)? = null
 
     init {
         // Auto-extract path params from URI pattern
@@ -33,7 +33,7 @@ class ResourceBuilder(private val uriPattern: String) {
     fun queryBool(name: String, default: Boolean? = null, description: String = "") =
         query(name, ParamType.BOOL, default, description)
 
-    fun handle(handler: (sessionId: String, params: ParsedParams) -> Map<String, Any?>) {
+    fun handle(handler: (params: ParsedParams) -> Map<String, Any?>) {
         handlerFn = handler
     }
 

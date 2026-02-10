@@ -42,7 +42,7 @@ class ResourceRegistry(
 
             McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
                 val params = def.parseParams(request.uri())
-                val result = def.handler(STATELESS_SESSION_ID, params)
+                val result = def.handler(params)
                 McpSchema.ReadResourceResult(
                     listOf(McpSchema.TextResourceContents(
                         request.uri(),
@@ -64,9 +64,9 @@ class ResourceRegistry(
                 .mimeType(def.mimeType)
                 .build()
 
-            McpServerFeatures.SyncResourceSpecification(resource) { exchange, request ->
+            McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
                 val params = def.parseParams(request.uri())
-                val result = def.handler(exchange.sessionId(), params)
+                val result = def.handler(params)
                 McpSchema.ReadResourceResult(
                     listOf(McpSchema.TextResourceContents(
                         request.uri(),
@@ -81,9 +81,5 @@ class ResourceRegistry(
     private fun specificity(pattern: String): Int {
         // Count non-variable segments for specificity
         return pattern.split("/").count { !it.startsWith("{") }
-    }
-
-    companion object {
-        const val STATELESS_SESSION_ID = "stateless"
     }
 }

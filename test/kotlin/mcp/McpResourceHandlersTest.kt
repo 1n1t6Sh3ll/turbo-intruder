@@ -8,7 +8,6 @@ class McpResourceHandlersTest {
 
     private lateinit var manager: RunManager
     private lateinit var handlers: McpResourceHandlers
-    private val testSessionId = "test-session"
 
     @BeforeEach
     fun setup() {
@@ -17,35 +16,17 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `listRuns returns empty when no runs`() {
-        val result = handlers.listRuns(testSessionId)
+    fun `getRunStatus returns error for nonexistent run`() {
+        val result = handlers.getRunStatus("nonexistent")
 
-        assertTrue((result["runs"] as List<*>).isEmpty())
-    }
-
-    @Test
-    fun `listRuns returns all runs`() {
-        manager.startConcurrentRun(testSessionId)
-        manager.startConcurrentRun(testSessionId)
-
-        val result = handlers.listRuns(testSessionId)
-        val runs = result["runs"] as List<*>
-
-        assertEquals(2, runs.size)
-    }
-
-    @Test
-    fun `getRunStatus returns error for no current run`() {
-        val result = handlers.getRunStatus(testSessionId, null)
-
-        assertEquals("no_current_run", result["error"])
+        assertEquals("not_found", result["error"])
     }
 
     @Test
     fun `getRunStatus returns run info`() {
-        manager.startRun(testSessionId)
+        val run = manager.startRun()
 
-        val result = handlers.getRunStatus(testSessionId, null)
+        val result = handlers.getRunStatus(run.id)
 
         assertNotNull(result["run_id"])
         assertNotNull(result["running"])
@@ -55,7 +36,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRunStatus includes summary when run is finished`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
 
         // Add some results
         val req1 = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
@@ -74,7 +55,7 @@ class McpResourceHandlersTest {
         // Mark run as finished (no engine created, so markScriptCompleted will trigger hasFinished=true)
         run.handler.markScriptCompleted()
 
-        val result = handlers.getRunStatus(testSessionId, null)
+        val result = handlers.getRunStatus(run.id)
 
         assertEquals(true, result["finished"])
         // Should include summary when finished
@@ -89,7 +70,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRunStatus does not include summary when run is still running`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
 
         // Add a result but don't mark as finished
         val req = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
@@ -97,7 +78,7 @@ class McpResourceHandlersTest {
         req.response = "HTTP/1.1 200 OK\r\n\r\nok"
         run.store.add(req)
 
-        val result = handlers.getRunStatus(testSessionId, null)
+        val result = handlers.getRunStatus(run.id)
 
         assertEquals(false, result["finished"])
         assertNull(result["summary"], "Status should NOT include summary when run is still running")
@@ -105,9 +86,9 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults returns empty list when no results`() {
-        manager.startRun(testSessionId)
+        val run = manager.startRun()
 
-        val result = handlers.getResults(testSessionId, null, "id", true, 100, 0)
+        val result = handlers.getResults(run.id, "id", true, 100, 0)
 
         assertEquals(0, result["total_count"])
         assertTrue((result["results"] as List<*>).isEmpty())
@@ -115,9 +96,9 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail returns error for invalid request`() {
-        manager.startRun(testSessionId)
+        val run = manager.startRun()
 
-        val result = handlers.getRequestDetail(testSessionId, null, 999)
+        val result = handlers.getRequestDetail(run.id, 999)
 
         assertEquals("request_not_found", result["error"])
     }
@@ -146,14 +127,14 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail returns headers and truncated body by default`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" +
             "A".repeat(500)  // 500-char body
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
+        val result = handlers.getRequestDetail(run.id,1, bodyLimit = 100)
 
         assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
         assertEquals("A".repeat(100), result["response_body"])
@@ -162,39 +143,39 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail respects custom body_limit`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "B".repeat(1000)
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 250)
+        val result = handlers.getRequestDetail(run.id,1, bodyLimit = 250)
 
         assertEquals("B".repeat(250), result["response_body"])
     }
 
     @Test
     fun `getRequestDetail returns full body when shorter than limit`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nshort"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
+        val result = handlers.getRequestDetail(run.id,1, bodyLimit = 100)
 
         assertEquals("short", result["response_body"])
     }
 
     @Test
     fun `getRequestDetail includes truncation metadata when truncated`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "A".repeat(500)
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
+        val result = handlers.getRequestDetail(run.id,1, bodyLimit = 100)
 
         assertEquals(true, result["response_body_truncated"])
         assertEquals(500, result["response_body_total_length"])
@@ -202,13 +183,13 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail truncation metadata shows false when not truncated`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nshort"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, bodyLimit = 100)
+        val result = handlers.getRequestDetail(run.id,1, bodyLimit = 100)
 
         assertEquals(false, result["response_body_truncated"])
         assertEquals(5, result["response_body_total_length"])
@@ -216,14 +197,14 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail with exportFile writes response to file and returns path`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         val fullResponse = "HTTP/1.1 200 OK\r\n\r\n" + "X".repeat(1000)
         request.response = fullResponse
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, exportFile = true)
+        val result = handlers.getRequestDetail(run.id,1, exportFile = true)
 
         assertNotNull(result["response_file"])
         val filePath = result["response_file"] as String
@@ -235,13 +216,13 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail with exportFile also exports request`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET /test HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nok"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, null, 1, exportFile = true)
+        val result = handlers.getRequestDetail(run.id,1, exportFile = true)
 
         assertNotNull(result["request_file"])
         val filePath = result["request_file"] as String
@@ -251,26 +232,26 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail respects body_limit parameter`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\n" + "Z".repeat(500)
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, "current", 1, bodyLimit = 50)
+        val result = handlers.getRequestDetail(run.id,1, bodyLimit = 50)
 
         assertEquals("Z".repeat(50), result["response_body"])
     }
 
     @Test
     fun `getRequestDetail respects exportFile parameter`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\ndata"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, "current", 1, exportFile = true)
+        val result = handlers.getRequestDetail(run.id,1, exportFile = true)
 
         assertNotNull(result["response_file"])
         assertNull(result["response_body"])
@@ -278,14 +259,14 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults includes anomaly_rank in results`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\n\r\nok"
         request.anomalyRank = 42
         run.store.add(request)
 
-        val result = handlers.getResults(testSessionId, null, "id", true, 100, 0)
+        val result = handlers.getResults(run.id,"id", true, 100, 0)
 
         val results = result["results"] as List<Map<String, Any?>>
         assertEquals(1, results.size)
@@ -294,13 +275,13 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getRequestDetail returns result by id for current run`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 36
         request.response = "HTTP/1.1 200 OK\r\n\r\ntest body"
         run.store.add(request)
 
-        val result = handlers.getRequestDetail(testSessionId, "current", 36)
+        val result = handlers.getRequestDetail(run.id,36)
 
         assertEquals("test body", result["response_body"])
         assertEquals(200, result["status"])
@@ -308,7 +289,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults can sort by anomaly_rank descending`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
 
         val req1 = burp.Request("GET /1 HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req1.id = 1
@@ -330,7 +311,7 @@ class McpResourceHandlersTest {
         run.store.add(req3)
 
         // Call getResults with anomaly_rank sorting
-        val result = handlers.getResults(testSessionId, "current", "anomaly_rank", true, 100, 0)
+        val result = handlers.getResults(run.id,"anomaly_rank", true, 100, 0)
 
         @Suppress("UNCHECKED_CAST")
         val results = result["results"] as List<Map<String, Any?>>
@@ -549,7 +530,7 @@ class McpResourceHandlersTest {
 
     @Test
     fun `getResults includes status_codes field with all unique status codes`() {
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
 
         val req200a = burp.Request("GET /a HTTP/1.1\r\nHost: example.com\r\n\r\n")
         req200a.id = 1
@@ -572,7 +553,7 @@ class McpResourceHandlersTest {
         run.store.add(req404)
         run.store.add(req500)
 
-        val result = handlers.getResults(testSessionId, null, "id", true, 100, 0)
+        val result = handlers.getResults(run.id,"id", true, 100, 0)
 
         @Suppress("UNCHECKED_CAST")
         val statusCodes = result["status_codes"] as Set<Int>
@@ -631,13 +612,13 @@ class McpResourceHandlersTest {
     @Test
     fun `getRequestDetail strips Connection header when desync mode enabled`() {
         val handlersWithDesync = McpResourceHandlers(manager, desyncMode = { true })
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html\r\n\r\nbody"
         run.store.add(request)
 
-        val result = handlersWithDesync.getRequestDetail(testSessionId, null, 1)
+        val result = handlersWithDesync.getRequestDetail(run.id,1)
 
         assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
     }
@@ -645,13 +626,13 @@ class McpResourceHandlersTest {
     @Test
     fun `getRequestDetail preserves Connection header when desync mode disabled`() {
         val handlersNoDesync = McpResourceHandlers(manager, desyncMode = { false })
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html\r\n\r\nbody"
         run.store.add(request)
 
-        val result = handlersNoDesync.getRequestDetail(testSessionId, null, 1)
+        val result = handlersNoDesync.getRequestDetail(run.id,1)
 
         assertEquals("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/html", result["response_headers"])
     }
@@ -659,13 +640,13 @@ class McpResourceHandlersTest {
     @Test
     fun `getRequestDetail strips Connection header case-insensitively`() {
         val handlersWithDesync = McpResourceHandlers(manager, desyncMode = { true })
-        val run = manager.startRun(testSessionId)
+        val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
         request.id = 1
         request.response = "HTTP/1.1 200 OK\r\nconnection: close\r\nContent-Type: text/html\r\n\r\nbody"
         run.store.add(request)
 
-        val result = handlersWithDesync.getRequestDetail(testSessionId, null, 1)
+        val result = handlersWithDesync.getRequestDetail(run.id,1)
 
         assertEquals("HTTP/1.1 200 OK\r\nContent-Type: text/html", result["response_headers"])
     }

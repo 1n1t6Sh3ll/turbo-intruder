@@ -52,7 +52,6 @@ class TurboMcpServer(
 ) {
     companion object {
         const val STATELESS_MODE = true
-        const val STATELESS_SESSION_ID = "stateless"
     }
 
     private val manager = RunManager()
@@ -69,11 +68,11 @@ class TurboMcpServer(
     /**
      * Test helper: invoke a resource handler by URI and parse the JSON result.
      */
-    fun invokeResourceHandler(uri: String, sessionId: String = STATELESS_SESSION_ID): Map<String, Any?> {
+    fun invokeResourceHandler(uri: String): Map<String, Any?> {
         val def = resourceRegistry.findResource(uri)
             ?: return mapOf("error" to "resource_not_found")
         val params = def.parseParams(uri)
-        return def.handler(sessionId, params)
+        return def.handler(params)
     }
 
     /** Test helper: invoke the stateless organizer list handler */
@@ -212,10 +211,8 @@ class TurboMcpServer(
         listOf(
             buildStartRunTool(),
             buildStartRunAsyncTool(),
-            buildStartConcurrentRunAsyncTool(),
             buildStopRunTool(),
             buildDeleteRunTool(),
-            buildDeleteAllRunsTool(),
             buildSetOrganizerNotesTool(),
             buildSaveToOrganizerTool(),
             buildGenerateCollaboratorPayloadTool(),
@@ -232,10 +229,8 @@ class TurboMcpServer(
         listOf(
             buildStatelessStartRunTool(),
             buildStatelessStartRunAsyncTool(),
-            buildStatelessStartConcurrentRunAsyncTool(),
             buildStatelessStopRunTool(),
             buildStatelessDeleteRunTool(),
-            buildStatelessDeleteAllRunsTool(),
             buildStatelessSetOrganizerNotesTool(),
             buildStatelessSaveToOrganizerTool(),
             buildStatelessGenerateCollaboratorPayloadTool(),
@@ -248,12 +243,12 @@ class TurboMcpServer(
         return allStatelessTools.filter { it.tool().name() !in disabledTools }
     }
 
-    // Stateless tool builders - use STATELESS_SESSION_ID instead of exchange.sessionId()
+    // Stateless tool builders
 
     private fun buildStatelessStartRunTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run")
-            .description("Start a new run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
+            .description("Start a new run and wait for completion. Returns results when complete or on timeout.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -274,7 +269,6 @@ class TurboMcpServer(
             executeToolWithErrorHandling {
                 val args = request.arguments()
                 toolHandlers.startRun(
-                    sessionId = STATELESS_SESSION_ID,
                     script = args["script"] as? String ?: "",
                     baseRequest = args["base_request"] as? String ?: "",
                     endpoint = args["endpoint"] as? String ?: "",
@@ -289,7 +283,7 @@ class TurboMcpServer(
     private fun buildStatelessStartRunAsyncTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run_async")
-            .description("Start a new run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
+            .description("Start a new run and return immediately. Use turbo://runs/{run_id} resource to poll for status and results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -309,41 +303,6 @@ class TurboMcpServer(
             executeToolWithErrorHandling {
                 val args = request.arguments()
                 toolHandlers.startRunAsync(
-                    sessionId = STATELESS_SESSION_ID,
-                    script = args["script"] as? String ?: "",
-                    baseRequest = args["base_request"] as? String ?: "",
-                    endpoint = args["endpoint"] as? String ?: "",
-                    baseInput = args["base_input"] as? String ?: "",
-                    normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
-                )
-            }
-        }
-    }
-
-    private fun buildStatelessStartConcurrentRunAsyncTool(): McpStatelessServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("start_concurrent_run")
-            .description("Start a new concurrent run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "script": { "type": "string", "description": "Python script code that controls the run" },
-                    "base_request": { "type": "string", "description": "The base HTTP request template with injection points marked as %s" },
-                    "endpoint": { "type": "string", "description": "Target endpoint URL (e.g., https://example.com)" },
-                    "base_input": { "type": "string", "description": "Input data to feed into the script (e.g., wordlist content)" },
-                    "normalize_line_endings": { "type": "boolean", "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true" }
-                },
-                "required": ["script", "base_request", "endpoint"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpStatelessServerFeatures.SyncToolSpecification(tool) { _, request ->
-            executeToolWithErrorHandling {
-                val args = request.arguments()
-                toolHandlers.startConcurrentRunAsync(
-                    sessionId = STATELESS_SESSION_ID,
                     script = args["script"] as? String ?: "",
                     baseRequest = args["base_request"] as? String ?: "",
                     endpoint = args["endpoint"] as? String ?: "",
@@ -357,20 +316,21 @@ class TurboMcpServer(
     private fun buildStatelessStopRunTool(): McpStatelessServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("stop_run")
-            .description("Stop the active run. Aborts the run but preserves the results.")
+            .description("Stop a run. Aborts the run but preserves the results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
-                    "run_id": { "type": "string", "description": "ID of the run to stop. Omit or use 'current' for the most recent run." }
-                }
+                    "run_id": { "type": "string", "description": "ID of the run to stop." }
+                },
+                "required": ["run_id"]
             }
             """.trimIndent())
             .build()
 
         return McpStatelessServerFeatures.SyncToolSpecification(tool) { _, request ->
             executeToolWithErrorHandling {
-                toolHandlers.stopRun(STATELESS_SESSION_ID, request.arguments()["run_id"] as? String)
+                toolHandlers.stopRun(request.arguments()["run_id"] as String)
             }
         }
     }
@@ -383,34 +343,16 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "run_id": { "type": "string", "description": "ID of the run to delete. Omit or use 'current' for the most recent run." }
-                }
+                    "run_id": { "type": "string", "description": "ID of the run to delete." }
+                },
+                "required": ["run_id"]
             }
             """.trimIndent())
             .build()
 
         return McpStatelessServerFeatures.SyncToolSpecification(tool) { _, request ->
             executeToolWithErrorHandling {
-                toolHandlers.deleteRun(STATELESS_SESSION_ID, request.arguments()["run_id"] as? String)
-            }
-        }
-    }
-
-    private fun buildStatelessDeleteAllRunsTool(): McpStatelessServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("delete_all_runs")
-            .description("Delete all runs and their results. Useful for cleanup.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {}
-            }
-            """.trimIndent())
-            .build()
-
-        return McpStatelessServerFeatures.SyncToolSpecification(tool) { _, _ ->
-            executeToolWithErrorHandling {
-                toolHandlers.deleteAllRuns(STATELESS_SESSION_ID)
+                toolHandlers.deleteRun(request.arguments()["run_id"] as String)
             }
         }
     }
@@ -450,10 +392,10 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "run_id": { "type": "string", "description": "ID of the run to save requests from. Omit for current run." },
+                    "run_id": { "type": "string", "description": "ID of the run to save requests from." },
                     "items": { "type": "string", "description": "JSON array of objects with request_id (int) and notes (string)" }
                 },
-                "required": ["items"]
+                "required": ["run_id", "items"]
             }
             """.trimIndent())
             .build()
@@ -462,8 +404,7 @@ class TurboMcpServer(
             executeToolWithErrorHandling {
                 val args = request.arguments()
                 toolHandlers.saveToOrganizer(
-                    sessionId = STATELESS_SESSION_ID,
-                    runId = args["run_id"] as? String,
+                    runId = args["run_id"] as String,
                     items = args["items"] as? String ?: "[]"
                 )
             }
@@ -528,9 +469,9 @@ class TurboMcpServer(
                 "type": "object",
                 "properties": {
                     "query": { "type": "string", "description": "The string to search for in response bodies" },
-                    "run_id": { "type": "string", "description": "ID of the run to search. Omit for current run." }
+                    "run_id": { "type": "string", "description": "ID of the run to search." }
                 },
-                "required": ["query"]
+                "required": ["query", "run_id"]
             }
             """.trimIndent())
             .build()
@@ -539,8 +480,7 @@ class TurboMcpServer(
             executeToolWithErrorHandling {
                 val args = request.arguments()
                 toolHandlers.searchResponses(
-                    sessionId = STATELESS_SESSION_ID,
-                    runId = args["run_id"] as? String,
+                    runId = args["run_id"] as String,
                     query = args["query"] as? String ?: ""
                 )
             }
@@ -557,7 +497,7 @@ class TurboMcpServer(
     private fun buildStartRunTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run")
-            .description("Start a new run and wait for completion. This clears any previous runs and starts fresh. Returns results when complete or on timeout.")
+            .description("Start a new run and wait for completion. Returns results when complete or on timeout.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -594,11 +534,10 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { exchange, request ->
+            .callHandler { _, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.startRun(
-                        sessionId = exchange.sessionId(),
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
@@ -614,7 +553,7 @@ class TurboMcpServer(
     private fun buildStartRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("start_run_async")
-            .description("Start a new run and return immediately. This clears any previous runs. Use turbo://runs/{run_id} resource to poll for status and results.")
+            .description("Start a new run and return immediately. Use turbo://runs/{run_id} resource to poll for status and results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
@@ -647,63 +586,10 @@ class TurboMcpServer(
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { exchange, request ->
+            .callHandler { _, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.startRunAsync(
-                        sessionId = exchange.sessionId(),
-                        script = args["script"] as? String ?: "",
-                        baseRequest = args["base_request"] as? String ?: "",
-                        endpoint = args["endpoint"] as? String ?: "",
-                        baseInput = args["base_input"] as? String ?: "",
-                        normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
-                    )
-                }
-            }
-            .build()
-    }
-
-    private fun buildStartConcurrentRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("start_concurrent_run")
-            .description("Start a new concurrent run. Does not clear previous runs, allowing multiple runs to execute in parallel.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "script": {
-                        "type": "string",
-                        "description": "Python script code that controls the run"
-                    },
-                    "base_request": {
-                        "type": "string",
-                        "description": "The base HTTP request template with injection points marked as %s"
-                    },
-                    "endpoint": {
-                        "type": "string",
-                        "description": "Target endpoint URL (e.g., https://example.com)"
-                    },
-                    "base_input": {
-                        "type": "string",
-                        "description": "Input data to feed into the script (e.g., wordlist content)"
-                    },
-                    "normalize_line_endings": {
-                        "type": "boolean",
-                        "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true"
-                    }
-                },
-                "required": ["script", "base_request", "endpoint"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { exchange, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.startConcurrentRunAsync(
-                        sessionId = exchange.sessionId(),
                         script = args["script"] as? String ?: "",
                         baseRequest = args["base_request"] as? String ?: "",
                         endpoint = args["endpoint"] as? String ?: "",
@@ -718,25 +604,26 @@ class TurboMcpServer(
     private fun buildStopRunTool(): McpServerFeatures.SyncToolSpecification {
         val tool = McpSchema.Tool.builder()
             .name("stop_run")
-            .description("Stop the active run. Aborts the run but preserves the results.")
+            .description("Stop a run. Aborts the run but preserves the results.")
             .inputSchema(jsonMapper, """
             {
                 "type": "object",
                 "properties": {
                     "run_id": {
                         "type": "string",
-                        "description": "ID of the run to stop. Omit or use 'current' for the most recent run."
+                        "description": "ID of the run to stop."
                     }
-                }
+                },
+                "required": ["run_id"]
             }
             """.trimIndent())
             .build()
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { exchange, request ->
+            .callHandler { _, request ->
                 executeToolWithErrorHandling {
-                    toolHandlers.stopRun(exchange.sessionId(), request.arguments()["run_id"] as? String)
+                    toolHandlers.stopRun(request.arguments()["run_id"] as String)
                 }
             }
             .build()
@@ -752,40 +639,19 @@ class TurboMcpServer(
                 "properties": {
                     "run_id": {
                         "type": "string",
-                        "description": "ID of the run to delete. Omit or use 'current' for the most recent run."
+                        "description": "ID of the run to delete."
                     }
-                }
+                },
+                "required": ["run_id"]
             }
             """.trimIndent())
             .build()
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { exchange, request ->
+            .callHandler { _, request ->
                 executeToolWithErrorHandling {
-                    toolHandlers.deleteRun(exchange.sessionId(), request.arguments()["run_id"] as? String)
-                }
-            }
-            .build()
-    }
-
-    private fun buildDeleteAllRunsTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("delete_all_runs")
-            .description("Delete all runs and their results. Useful for cleanup.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {}
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { exchange, _ ->
-                executeToolWithErrorHandling {
-                    toolHandlers.deleteAllRuns(exchange.sessionId())
+                    toolHandlers.deleteRun(request.arguments()["run_id"] as String)
                 }
             }
             .build()
@@ -837,26 +703,25 @@ class TurboMcpServer(
                 "properties": {
                     "run_id": {
                         "type": "string",
-                        "description": "ID of the run to save requests from. Omit for current run."
+                        "description": "ID of the run to save requests from."
                     },
                     "items": {
                         "type": "string",
                         "description": "JSON array of objects with request_id (int) and notes (string)"
                     }
                 },
-                "required": ["items"]
+                "required": ["run_id", "items"]
             }
             """.trimIndent())
             .build()
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { exchange, request ->
+            .callHandler { _, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.saveToOrganizer(
-                        sessionId = exchange.sessionId(),
-                        runId = args["run_id"] as? String,
+                        runId = args["run_id"] as String,
                         items = args["items"] as? String ?: "[]"
                     )
                 }
@@ -940,22 +805,21 @@ class TurboMcpServer(
                     },
                     "run_id": {
                         "type": "string",
-                        "description": "ID of the run to search. Omit for current run."
+                        "description": "ID of the run to search."
                     }
                 },
-                "required": ["query"]
+                "required": ["query", "run_id"]
             }
             """.trimIndent())
             .build()
 
         return McpServerFeatures.SyncToolSpecification.builder()
             .tool(tool)
-            .callHandler { exchange, request ->
+            .callHandler { _, request ->
                 executeToolWithErrorHandling {
                     val args = request.arguments()
                     toolHandlers.searchResponses(
-                        sessionId = exchange.sessionId(),
-                        runId = args["run_id"] as? String,
+                        runId = args["run_id"] as String,
                         query = args["query"] as? String ?: ""
                     )
                 }

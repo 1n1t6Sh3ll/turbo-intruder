@@ -12,7 +12,7 @@ class ResourceRegistryTest {
         val def = resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> mapOf("runs" to emptyList<Any>()) }
+            handle { mapOf("runs" to emptyList<Any>()) }
         }
         registry.register(def)
 
@@ -29,7 +29,7 @@ class ResourceRegistryTest {
             name = "List organizer"
             description = "List organizer items"
             queryString("domain", description = "filter domain")
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
         registry.register(def)
 
@@ -45,7 +45,7 @@ class ResourceRegistryTest {
         val def = resource("turbo://runs/{run_id}") {
             name = "Run status"
             description = "Get run status"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
         registry.register(def)
 
@@ -63,17 +63,17 @@ class ResourceRegistryTest {
         registry.register(resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> mapOf("type" to "list") }
+            handle { mapOf("type" to "list") }
         })
         registry.register(resource("turbo://runs/{run_id}") {
             name = "Run status"
             description = "Get run status"
-            handle { _, _ -> mapOf("type" to "status") }
+            handle { mapOf("type" to "status") }
         })
         registry.register(resource("turbo://runs/{run_id}/summary") {
             name = "Run summary"
             description = "Get run summary"
-            handle { _, _ -> mapOf("type" to "summary") }
+            handle { mapOf("type" to "summary") }
         })
 
         assertEquals("turbo://runs", registry.findResource("turbo://runs")?.uriPattern)
@@ -87,7 +87,7 @@ class ResourceRegistryTest {
         registry.register(resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         })
 
         val found = registry.findResource("turbo://unknown")
@@ -102,12 +102,12 @@ class ResourceRegistryTest {
         val def1 = resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
         val def2 = resource("turbo://docs") {
             name = "List docs"
             description = "List docs"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         registry.register(def1, def2)
@@ -123,12 +123,12 @@ class ResourceRegistryTest {
         registry.register(resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         })
         registry.register(resource("turbo://docs") {
             name = "List docs"
             description = "List docs"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         })
 
         val definitions = registry.getDefinitions()
@@ -142,12 +142,12 @@ class ResourceRegistryTest {
         registry.register(resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> mapOf("runs" to emptyList<Any>()) }
+            handle { mapOf("runs" to emptyList<Any>()) }
         })
         registry.register(resource("turbo://docs") {
             name = "List docs"
             description = "List docs"
-            handle { _, _ -> mapOf("topics" to emptyList<Any>()) }
+            handle { mapOf("topics" to emptyList<Any>()) }
         })
 
         val specs = registry.buildStatelessSpecs()
@@ -166,7 +166,7 @@ class ResourceRegistryTest {
             description = "List organizer items"
             queryString("domain", description = "filter by host")
             queryInt("page", default = 1)
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         })
 
         val specs = registry.buildStatelessSpecs()
@@ -184,7 +184,7 @@ class ResourceRegistryTest {
         registry.register(resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> mapOf("runs" to emptyList<Any>()) }
+            handle { mapOf("runs" to emptyList<Any>()) }
         })
 
         val specs = registry.buildStatefulSpecs()

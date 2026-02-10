@@ -41,11 +41,11 @@ class TurboMcpServerTest {
     fun `disabled tools are excluded`() {
         val server = TurboMcpServer(
             port = 31337,
-            disabledTools = setOf("start_run", "start_concurrent_run")
+            disabledTools = setOf("start_run", "start_run_async")
         )
         val toolNames = server.getEnabledToolNames()
         assertFalse(toolNames.contains("start_run"))
-        assertFalse(toolNames.contains("start_concurrent_run"))
+        assertFalse(toolNames.contains("start_run_async"))
         assertTrue(toolNames.contains("stop_run"))
         assertTrue(toolNames.contains("set_organizer_notes"))
     }
@@ -174,16 +174,16 @@ class TurboMcpServerTest {
         val server = TurboMcpServer(port = 31337)
 
         // Start a run so we have something to query
-        server.toolHandlers.startRunAsync(
-            sessionId = "stateless",
+        val startResult = server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
             baseInput = ""
         )
+        val runId = startResult["run_id"] as String
 
         // Invoke stateless handler with limit param
-        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?limit=5")
+        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?limit=5")
 
         // The limit should be applied (even if there are 0 results, the param should be parsed)
         assertNotNull(result["results"], "Should have results key")
@@ -194,17 +194,17 @@ class TurboMcpServerTest {
     fun `stateless run summary handler parses sort_by query param`() {
         val server = TurboMcpServer(port = 31337)
 
-        server.toolHandlers.startRunAsync(
-            sessionId = "stateless",
+        val startResult = server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
             baseInput = ""
         )
+        val runId = startResult["run_id"] as String
 
         // These should not error - if params aren't parsed, invalid sort_by would be ignored
-        val resultById = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?sort_by=id")
-        val resultByLength = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?sort_by=length")
+        val resultById = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?sort_by=id")
+        val resultByLength = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?sort_by=length")
 
         assertNotNull(resultById["results"])
         assertNotNull(resultByLength["results"])
@@ -214,15 +214,15 @@ class TurboMcpServerTest {
     fun `stateless run summary handler parses offset query param`() {
         val server = TurboMcpServer(port = 31337)
 
-        server.toolHandlers.startRunAsync(
-            sessionId = "stateless",
+        val startResult = server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
             baseInput = ""
         )
+        val runId = startResult["run_id"] as String
 
-        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/current/summary?offset=10&limit=5")
+        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?offset=10&limit=5")
 
         assertNotNull(result["results"])
         assertNull(result["error"])
@@ -232,16 +232,16 @@ class TurboMcpServerTest {
     fun `stateless request detail handler parses body_limit query param`() {
         val server = TurboMcpServer(port = 31337)
 
-        server.toolHandlers.startRunAsync(
-            sessionId = "stateless",
+        val startResult = server.toolHandlers.startRunAsync(
             script = "def queueRequests(t, w): pass\ndef completed(r): pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: test\r\n\r\n",
             endpoint = "https://test.com:443",
             baseInput = ""
         )
+        val runId = startResult["run_id"] as String
 
         // Request with body_limit - should parse without error even if no results exist
-        val result = server.invokeStatelessRequestDetailHandler("turbo://runs/current/1?body_limit=500")
+        val result = server.invokeStatelessRequestDetailHandler("turbo://runs/$runId/1?body_limit=500")
 
         // Will return request_not_found since there are no actual results, but should not error on parsing
         assertTrue(result.containsKey("error") || result.containsKey("request"),

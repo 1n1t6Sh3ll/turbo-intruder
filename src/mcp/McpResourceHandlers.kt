@@ -57,22 +57,9 @@ class McpResourceHandlers(
         return examples
     }
 
-    fun listRuns(sessionId: String): Map<String, Any> {
-        val runs = manager.getAllRuns(sessionId).map { run ->
-            mapOf(
-                "run_id" to run.id,
-                "running" to run.handler.isRunning(),
-                "finished" to run.handler.hasFinished(),
-                "result_count" to run.store.count(),
-                "created_at" to run.createdAt
-            )
-        }
-        return mapOf("runs" to runs)
-    }
-
-    fun getRunStatus(sessionId: String, runId: String?): Map<String, Any?> {
-        val run = manager.getRun(sessionId, runId)
-            ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
+    fun getRunStatus(runId: String): Map<String, Any?> {
+        val run = manager.getRun(runId)
+            ?: return mapOf("error" to "not_found")
 
         val baseStatus = mapOf(
             "run_id" to run.id,
@@ -105,15 +92,14 @@ class McpResourceHandlers(
     }
 
     fun getResults(
-        sessionId: String,
-        runId: String?,
+        runId: String,
         sortBy: String,
         descending: Boolean,
         limit: Int,
         offset: Int
     ): Map<String, Any?> {
-        val run = manager.getRun(sessionId, runId)
-            ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
+        val run = manager.getRun(runId)
+            ?: return mapOf("error" to "not_found")
 
         val sortField = try {
             SortField.valueOf(sortBy.uppercase())
@@ -142,14 +128,13 @@ class McpResourceHandlers(
     }
 
     fun getRequestDetail(
-        sessionId: String,
-        runId: String?,
+        runId: String,
         requestId: Int,
         bodyLimit: Int = 100,
         exportFile: Boolean = false
     ): Map<String, Any?> {
-        val run = manager.getRun(sessionId, runId)
-            ?: return mapOf("error" to if (runId == null || runId == "current") "no_current_run" else "not_found")
+        val run = manager.getRun(runId)
+            ?: return mapOf("error" to "not_found")
 
         val request = run.store.getRequest(requestId)
             ?: return mapOf("error" to "request_not_found")

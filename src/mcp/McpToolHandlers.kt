@@ -45,8 +45,8 @@ class McpToolHandlers(
         )
     }
 
-    fun saveToOrganizer(sessionId: String, runId: String?, items: String): Map<String, Any> {
-        val run = manager.getRun(sessionId, runId)
+    fun saveToOrganizer(runId: String, items: String): Map<String, Any> {
+        val run = manager.getRun(runId)
             ?: return mapOf("saved" to emptyList<Int>(), "errors" to listOf(mapOf("error" to "No run found")))
 
         val mapper = ObjectMapper()
@@ -75,7 +75,6 @@ class McpToolHandlers(
     }
 
     fun startRun(
-        sessionId: String,
         script: String,
         baseRequest: String,
         endpoint: String,
@@ -84,7 +83,7 @@ class McpToolHandlers(
         normalizeLineEndings: Boolean = true
     ): Map<String, Any?> {
         val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
-        val run = manager.startRun(sessionId)
+        val run = manager.startRun()
         launchRun(run, normalized.script, baseRequest, endpoint, baseInput)
 
         // Wait for completion or timeout
@@ -130,7 +129,6 @@ class McpToolHandlers(
     }
 
     fun startRunAsync(
-        sessionId: String,
         script: String,
         baseRequest: String,
         endpoint: String,
@@ -138,46 +136,23 @@ class McpToolHandlers(
         normalizeLineEndings: Boolean = true
     ): Map<String, Any?> {
         val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
-        val run = manager.startRun(sessionId)
+        val run = manager.startRun()
         launchRun(run, normalized.script, baseRequest, endpoint, baseInput)
         val result = mutableMapOf<String, Any?>("status" to "started", "run_id" to run.id)
         normalized.warning?.let { result["warning"] = it }
         return result
     }
 
-    fun startConcurrentRunAsync(
-        sessionId: String,
-        script: String,
-        baseRequest: String,
-        endpoint: String,
-        baseInput: String,
-        normalizeLineEndings: Boolean = true
-    ): Map<String, Any?> {
-        val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
-        val run = manager.startConcurrentRun(sessionId)
-        launchRun(run, normalized.script, baseRequest, endpoint, baseInput)
-        val result = mutableMapOf<String, Any?>(
-            "status" to "started",
-            "run_id" to run.id
-        )
-        normalized.warning?.let { result["warning"] = it }
-        return result
+    fun stopRun(runId: String): Map<String, String> {
+        return mapOf("status" to manager.stopRun(runId))
     }
 
-    fun stopRun(sessionId: String, runId: String?): Map<String, String> {
-        return mapOf("status" to manager.stopRun(sessionId, runId))
+    fun deleteRun(runId: String): Map<String, String> {
+        return mapOf("status" to manager.deleteRun(runId))
     }
 
-    fun deleteRun(sessionId: String, runId: String?): Map<String, String> {
-        return mapOf("status" to manager.deleteRun(sessionId, runId))
-    }
-
-    fun deleteAllRuns(sessionId: String): Map<String, Int> {
-        return mapOf("deleted_count" to manager.deleteAllRuns(sessionId))
-    }
-
-    fun searchResponses(sessionId: String, runId: String?, query: String): Map<String, Any> {
-        val run = manager.getRun(sessionId, runId)
+    fun searchResponses(runId: String, query: String): Map<String, Any> {
+        val run = manager.getRun(runId)
             ?: return mapOf("error" to "No run found")
 
         val matches = run.store.getAllRquests()

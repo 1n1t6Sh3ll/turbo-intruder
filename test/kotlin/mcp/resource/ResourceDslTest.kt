@@ -10,7 +10,7 @@ class ResourceDslTest {
         val def = resource("turbo://runs") {
             name = "List runs"
             description = "List all runs"
-            handle { _, _ -> mapOf("runs" to emptyList<Any>()) }
+            handle { mapOf("runs" to emptyList<Any>()) }
         }
 
         assertEquals("turbo://runs", def.uriPattern)
@@ -26,7 +26,7 @@ class ResourceDslTest {
         val def = resource("turbo://runs/{run_id}") {
             name = "Run status"
             description = "Get run status"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         assertEquals(1, def.pathParams.size)
@@ -38,7 +38,7 @@ class ResourceDslTest {
         val def = resource("turbo://runs/{run_id}/{id}") {
             name = "Request detail"
             description = "Get request detail"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         assertEquals(2, def.pathParams.size)
@@ -52,7 +52,7 @@ class ResourceDslTest {
             name = "Run summary"
             description = "Get run summary"
             queryString("sort_by", default = "id", description = "sort field")
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         assertEquals(1, def.queryParams.size)
@@ -68,7 +68,7 @@ class ResourceDslTest {
             name = "List organizer"
             description = "List organizer items"
             queryInt("page", default = 1, description = "page number")
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         assertEquals(1, def.queryParams.size)
@@ -83,7 +83,7 @@ class ResourceDslTest {
             name = "Run summary"
             description = "Get run summary"
             queryBool("descending", default = true, description = "sort order")
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         assertEquals(1, def.queryParams.size)
@@ -98,31 +98,28 @@ class ResourceDslTest {
             name = "Doc topic"
             description = "Get documentation"
             mimeType = "text/markdown"
-            handle { _, _ -> emptyMap() }
+            handle { emptyMap() }
         }
 
         assertEquals("text/markdown", def.mimeType)
     }
 
     @Test
-    fun `resource DSL handler receives session and params`() {
-        var capturedSessionId: String? = null
+    fun `resource DSL handler receives params`() {
         var capturedParams: ParsedParams? = null
 
         val def = resource("turbo://runs/{run_id}") {
             name = "Run status"
             description = "Get run status"
-            handle { sessionId, params ->
-                capturedSessionId = sessionId
+            handle { params ->
                 capturedParams = params
                 mapOf("status" to "ok")
             }
         }
 
         val params = def.parseParams("turbo://runs/abc123")
-        val result = def.handler("test-session", params)
+        val result = def.handler(params)
 
-        assertEquals("test-session", capturedSessionId)
         assertEquals("abc123", capturedParams?.path("run_id"))
         assertEquals("ok", result["status"])
     }
@@ -132,7 +129,7 @@ class ResourceDslTest {
         assertThrows(IllegalArgumentException::class.java) {
             resource("turbo://runs") {
                 description = "List all runs"
-                handle { _, _ -> emptyMap() }
+                handle { emptyMap() }
             }
         }
     }
@@ -142,7 +139,7 @@ class ResourceDslTest {
         assertThrows(IllegalArgumentException::class.java) {
             resource("turbo://runs") {
                 name = "List runs"
-                handle { _, _ -> emptyMap() }
+                handle { emptyMap() }
             }
         }
     }

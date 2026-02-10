@@ -17,7 +17,6 @@ class McpResourceDefinitionsTest {
 
         val uris = definitions.map { it.uriPattern }.toSet()
 
-        assertTrue(uris.contains("turbo://runs"))
         assertTrue(uris.contains("turbo://runs/{run_id}"))
         assertTrue(uris.contains("turbo://runs/{run_id}/summary"))
         assertTrue(uris.contains("turbo://runs/{run_id}/{id}"))
@@ -30,18 +29,6 @@ class McpResourceDefinitionsTest {
         assertTrue(uris.contains("turbo://docs/response-processing"))
         assertTrue(uris.contains("turbo://docs/decorators"))
         assertTrue(uris.contains("turbo://docs/misc"))
-    }
-
-    @Test
-    fun `runs list definition has correct metadata`() {
-        val definitions = createResourceDefinitions(handlers)
-        val def = definitions.find { it.uriPattern == "turbo://runs" }!!
-
-        assertEquals("List of all runs", def.name)
-        assertTrue(def.baseDescription.contains("List all runs"))
-        assertEquals("application/json", def.mimeType)
-        assertTrue(def.pathParams.isEmpty())
-        assertTrue(def.queryParams.isEmpty())
     }
 
     @Test
@@ -145,13 +132,13 @@ class McpResourceDefinitionsTest {
     @Test
     fun `handlers are invoked with correct params`() {
         val definitions = createResourceDefinitions(handlers)
-        val def = definitions.find { it.uriPattern == "turbo://runs" }!!
+        val def = definitions.find { it.uriPattern == "turbo://runs/{run_id}" }!!
 
-        val params = def.parseParams("turbo://runs")
-        val result = def.handler("test-session", params)
+        val params = def.parseParams("turbo://runs/nonexistent")
+        val result = def.handler(params)
 
-        // Should return runs list (empty since no runs exist)
-        assertTrue(result.containsKey("runs"))
+        // Should return not_found since run doesn't exist
+        assertEquals("not_found", result["error"])
     }
 
     @Test

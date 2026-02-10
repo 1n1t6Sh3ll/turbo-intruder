@@ -7,7 +7,7 @@ class ResourceDefinition(
     val mimeType: String = "application/json",
     val pathParams: List<ResourceParam.PathParam>,
     val queryParams: List<ResourceParam.QueryParam<*>>,
-    val handler: (sessionId: String, params: ParsedParams) -> Map<String, Any?>
+    val handler: (params: ParsedParams) -> Map<String, Any?>
 ) {
     /** Base URI without query params, used for SDK registration */
     val baseUri: String get() = uriPattern

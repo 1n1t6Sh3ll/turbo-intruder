@@ -13,7 +13,7 @@ class ResourceDefinitionTest {
             baseDescription = "List all runs",
             pathParams = emptyList(),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertTrue(def.matches("turbo://runs"))
@@ -31,7 +31,7 @@ class ResourceDefinitionTest {
             queryParams = listOf(
                 ResourceParam.QueryParam("domain", ParamType.STRING, null, "filter")
             ),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertTrue(def.matches("turbo://organizer"))
@@ -48,7 +48,7 @@ class ResourceDefinitionTest {
             baseDescription = "Get run status",
             pathParams = listOf(ResourceParam.PathParam("run_id")),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertTrue(def.matches("turbo://runs/abc123"))
@@ -68,7 +68,7 @@ class ResourceDefinitionTest {
                 ResourceParam.PathParam("id")
             ),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertTrue(def.matches("turbo://runs/abc/123"))
@@ -87,7 +87,7 @@ class ResourceDefinitionTest {
             queryParams = listOf(
                 ResourceParam.QueryParam("limit", ParamType.INT, 100, "max results")
             ),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertTrue(def.matches("turbo://runs/abc/summary"))
@@ -103,7 +103,7 @@ class ResourceDefinitionTest {
             baseDescription = "Get run status",
             pathParams = listOf(ResourceParam.PathParam("run_id")),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         val params = def.parseParams("turbo://runs/abc123")
@@ -122,7 +122,7 @@ class ResourceDefinitionTest {
                 ResourceParam.PathParam("id")
             ),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         val params = def.parseParams("turbo://runs/abc/123")
@@ -140,7 +140,7 @@ class ResourceDefinitionTest {
             baseDescription = "Get run summary",
             pathParams = listOf(ResourceParam.PathParam("run_id")),
             queryParams = listOf(queryDef),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         val params = def.parseParams("turbo://runs/abc/summary?limit=50")
@@ -158,7 +158,7 @@ class ResourceDefinitionTest {
             baseDescription = "Get run summary",
             pathParams = listOf(ResourceParam.PathParam("run_id")),
             queryParams = listOf(queryDef),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         val params = def.parseParams("turbo://runs/abc/summary")
@@ -177,7 +177,7 @@ class ResourceDefinitionTest {
                 ResourceParam.QueryParam("sort_by", ParamType.STRING, "id", "sort field"),
                 ResourceParam.QueryParam("limit", ParamType.INT, 100, "max results")
             ),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         val description = def.fullDescription
@@ -197,7 +197,7 @@ class ResourceDefinitionTest {
             baseDescription = "List all runs",
             pathParams = emptyList(),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertEquals("List all runs", def.fullDescription)
@@ -211,7 +211,7 @@ class ResourceDefinitionTest {
             baseDescription = "Get run status",
             pathParams = listOf(ResourceParam.PathParam("run_id")),
             queryParams = emptyList(),
-            handler = { _, _ -> emptyMap() }
+            handler = { emptyMap() }
         )
 
         assertEquals("turbo://runs/{run_id}", def.baseUri)
