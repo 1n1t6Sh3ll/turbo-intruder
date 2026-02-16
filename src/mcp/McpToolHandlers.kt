@@ -108,18 +108,7 @@ class McpToolHandlers(
             "status" to if (failed) "failed" else "completed",
             "run_id" to run.id,
             "result_count" to run.store.count(),
-            "results" to results.map { req ->
-                mapOf(
-                    "id" to req.id,
-                    "status" to req.code,
-                    "length" to req.length,
-                    "time" to req.time,
-                    "wordcount" to req.wordcount,
-                    "words" to req.words,
-                    "label" to req.label,
-                    "anomaly_rank" to req.anomalyRank
-                )
-            }
+            "results" to results.map { it.toSummaryMap() }
         )
         if (failed) {
             result["error_message"] = run.handler.statusString()
@@ -156,7 +145,7 @@ class McpToolHandlers(
             ?: return mapOf("error" to "No run found")
 
         val matches = run.store.getAllRquests()
-            .filter { it.response?.contains(query) == true }
+            .filter { it.response?.contains(query) == true || it.label.contains(query) }
             .map { it.id }
 
         return mapOf(

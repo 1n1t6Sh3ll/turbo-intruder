@@ -243,6 +243,26 @@ def completed(results):
     }
 
     @Test
+    fun `searchResponses can find entries by label`() {
+        val run = manager.startRun()
+        val req1 = burp.Request("GET /a HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.label = "interesting"
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nOK"
+        val req2 = burp.Request("GET /b HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req2.id = 2
+        req2.label = "boring"
+        req2.response = "HTTP/1.1 200 OK\r\n\r\nOK"
+        run.store.add(req1)
+        run.store.add(req2)
+
+        val result = handlers.searchResponses(runId = run.id, query = "interesting")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(listOf(1), matches)
+    }
+
+    @Test
     fun `searchResponses returns error when no run found`() {
         val result = handlers.searchResponses(runId = "nonexistent", query = "test")
 
