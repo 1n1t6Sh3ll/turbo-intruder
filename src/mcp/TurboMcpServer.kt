@@ -3,11 +3,8 @@ package mcp
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper
 import io.modelcontextprotocol.server.McpServer
-import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpStatelessServerFeatures
-import io.modelcontextprotocol.server.McpSyncServer
 import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport
-import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider
 import io.modelcontextprotocol.spec.McpSchema
 import jakarta.servlet.DispatcherType
 import jakarta.servlet.Filter
@@ -26,7 +23,6 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.ServerConnector
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.time.Duration
 import java.util.EnumSet
 
 /**
@@ -43,6 +39,8 @@ fun formatErrorWithStackTrace(e: Exception): Map<String, Any?> {
     )
 }
 
+private const val ENABLE_ASYNC_RUN = false
+
 class TurboMcpServer(
     private val port: Int = 31338,
     private val disabledTools: Set<String> = emptySet(),
@@ -50,10 +48,6 @@ class TurboMcpServer(
     private val organizerProvider: OrganizerProvider = BurpOrganizerProvider(),
     private val desyncMode: () -> Boolean = { false }
 ) {
-    companion object {
-        const val STATELESS_MODE = true
-    }
-
     private val manager = RunManager()
     val toolHandlers = McpToolHandlers(manager, organizerProvider, collaboratorProvider)
     val resourceHandlers = McpResourceHandlers(manager, organizerProvider, desyncMode)
@@ -75,19 +69,6 @@ class TurboMcpServer(
         return def.handler(params)
     }
 
-    /** Test helper: invoke the stateless organizer list handler */
-    fun invokeStatelessOrganizerListHandler(uri: String) = invokeResourceHandler(uri)
-
-    /** Test helper: invoke the stateless organizer item handler */
-    fun invokeStatelessOrganizerItemHandler(uri: String) = invokeResourceHandler(uri)
-
-    /** Test helper: invoke the stateless run summary handler */
-    fun invokeStatelessRunSummaryHandler(uri: String) = invokeResourceHandler(uri)
-
-    /** Test helper: invoke the stateless request detail handler */
-    fun invokeStatelessRequestDetailHandler(uri: String) = invokeResourceHandler(uri)
-
-    private var server: McpSyncServer? = null
     private var statelessServer: io.modelcontextprotocol.server.McpStatelessSyncServer? = null
     private var jettyServer: Server? = null
     private val jsonMapper = JacksonMcpJsonMapper(ObjectMapper())
@@ -148,87 +129,41 @@ class TurboMcpServer(
             EnumSet.of(DispatcherType.REQUEST)
         )
 
-        if (STATELESS_MODE) {
-            // Stateless HTTP transport - no sessions, simpler client compatibility
-            val transport = HttpServletStatelessServerTransport.builder()
-                .jsonMapper(jsonMapper)
-                .messageEndpoint("/")
-                .build()
+        // Stateless HTTP transport - no sessions, simpler client compatibility
+        val transport = HttpServletStatelessServerTransport.builder()
+            .jsonMapper(jsonMapper)
+            .messageEndpoint("/")
+            .build()
 
-            context.addServlet(ServletHolder(transport), "/*")
-            jetty.handler = context
-            jetty.start()
-            jettyServer = jetty
+        context.addServlet(ServletHolder(transport), "/*")
+        jetty.handler = context
+        jetty.start()
+        jettyServer = jetty
 
-            statelessServer = McpServer.sync(transport)
-                .serverInfo("turbo-simulator", "1.0.0")
-                .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
-                .capabilities(McpSchema.ServerCapabilities.builder()
-                    .tools(true)  // listChanged
-                    .resources(true, true)  // subscribe, listChanged
-                    .logging()
-                    .build())
-                .tools(buildStatelessToolSpecifications())
-                .resources(resourceRegistry.buildStatelessSpecs())
-                .build()
-        } else {
-            // SSE streaming transport - supports sessions
-            val transportProvider = HttpServletStreamableServerTransportProvider.builder()
-                .jsonMapper(jsonMapper)
-                .mcpEndpoint("/")
-                .keepAliveInterval(Duration.ofSeconds(30))
-                .build()
-
-            context.addServlet(ServletHolder(transportProvider), "/*")
-            jetty.handler = context
-            jetty.start()
-            jettyServer = jetty
-
-            server = McpServer.sync(transportProvider)
-                .serverInfo("turbo-simulator", "1.0.0")
-                .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
-                .capabilities(McpSchema.ServerCapabilities.builder()
-                    .tools(true)  // listChanged
-                    .resources(true, true)  // subscribe, listChanged
-                    .logging()
-                    .build())
-                .tools(buildToolSpecifications())
-                .resources(resourceRegistry.buildStatefulSpecs())
-                .build()
-        }
+        statelessServer = McpServer.sync(transport)
+            .serverInfo("turbo-simulator", "1.0.0")
+            .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
+            .capabilities(McpSchema.ServerCapabilities.builder()
+                .tools(true)  // listChanged
+                .resources(true, true)  // subscribe, listChanged
+                .logging()
+                .build())
+            .tools(buildStatelessToolSpecifications())
+            .resources(resourceRegistry.buildStatelessSpecs())
+            .build()
     }
 
     fun stop() {
-        server?.close()
-        server = null
         statelessServer?.close()
         statelessServer = null
         jettyServer?.stop()
         jettyServer = null
     }
 
-    private val allTools by lazy {
-        listOf(
-            buildStartRunTool(),
-            buildStartRunAsyncTool(),
-            buildStopRunTool(),
-            buildDeleteRunTool(),
-            buildSetOrganizerNotesTool(),
-            buildSaveToOrganizerTool(),
-            buildGenerateCollaboratorPayloadTool(),
-            buildGetCollaboratorInteractionsTool(),
-            buildSearchResponsesTool()
-        )
-    }
-
-    private fun buildToolSpecifications(): List<McpServerFeatures.SyncToolSpecification> {
-        return allTools.filter { it.tool().name() !in disabledTools }
-    }
-
     private val allStatelessTools by lazy {
-        listOf(
+        listOfNotNull(
             buildStatelessStartRunTool(),
-            buildStatelessStartRunAsyncTool(),
+            if (ENABLE_ASYNC_RUN) buildStatelessStartRunAsyncTool() else null,
             buildStatelessStopRunTool(),
             buildStatelessDeleteRunTool(),
             buildStatelessSetOrganizerNotesTool(),
@@ -488,343 +423,10 @@ class TurboMcpServer(
     }
 
     fun getEnabledToolNames(): Set<String> {
-        return allTools
+        return allStatelessTools
             .filter { it.tool().name() !in disabledTools }
             .map { it.tool().name() }
             .toSet()
-    }
-
-    private fun buildStartRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("start_run")
-            .description("Start a new run and wait for completion. Returns results when complete or on timeout.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "script": {
-                        "type": "string",
-                        "description": "Python script code that controls the run"
-                    },
-                    "base_request": {
-                        "type": "string",
-                        "description": "The base HTTP request template with injection points marked as %s"
-                    },
-                    "endpoint": {
-                        "type": "string",
-                        "description": "Target endpoint URL (e.g., https://example.com)"
-                    },
-                    "base_input": {
-                        "type": "string",
-                        "description": "Input data to feed into the script (e.g., wordlist content)"
-                    },
-                    "timeout_ms": {
-                        "type": "integer",
-                        "description": "Timeout in milliseconds (default: 60000). If exceeded, returns run_id for manual polling."
-                    },
-                    "normalize_line_endings": {
-                        "type": "boolean",
-                        "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true"
-                    }
-                },
-                "required": ["script", "base_request", "endpoint"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.startRun(
-                        script = args["script"] as? String ?: "",
-                        baseRequest = args["base_request"] as? String ?: "",
-                        endpoint = args["endpoint"] as? String ?: "",
-                        baseInput = args["base_input"] as? String ?: "",
-                        timeoutMs = (args["timeout_ms"] as? Number)?.toLong() ?: 60000,
-                        normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
-                    )
-                }
-            }
-            .build()
-    }
-
-    private fun buildStartRunAsyncTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("start_run_async")
-            .description("Start a new run and return immediately. Use turbo://runs/{run_id} resource to poll for status and results.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "script": {
-                        "type": "string",
-                        "description": "Python script code that controls the run"
-                    },
-                    "base_request": {
-                        "type": "string",
-                        "description": "The base HTTP request template with injection points marked as %s"
-                    },
-                    "endpoint": {
-                        "type": "string",
-                        "description": "Target endpoint URL (e.g., https://example.com)"
-                    },
-                    "base_input": {
-                        "type": "string",
-                        "description": "Input data to feed into the script (e.g., wordlist content)"
-                    },
-                    "normalize_line_endings": {
-                        "type": "boolean",
-                        "description": "Whether to normalize mixed line endings (\\n and \\r\\n) to \\r\\n. Default: true"
-                    }
-                },
-                "required": ["script", "base_request", "endpoint"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.startRunAsync(
-                        script = args["script"] as? String ?: "",
-                        baseRequest = args["base_request"] as? String ?: "",
-                        endpoint = args["endpoint"] as? String ?: "",
-                        baseInput = args["base_input"] as? String ?: "",
-                        normalizeLineEndings = (args["normalize_line_endings"] as? Boolean) ?: true
-                    )
-                }
-            }
-            .build()
-    }
-
-    private fun buildStopRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("stop_run")
-            .description("Stop a run. Aborts the run but preserves the results.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "run_id": {
-                        "type": "string",
-                        "description": "ID of the run to stop."
-                    }
-                },
-                "required": ["run_id"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    toolHandlers.stopRun(request.arguments()["run_id"] as String)
-                }
-            }
-            .build()
-    }
-
-    private fun buildDeleteRunTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("delete_run")
-            .description("Delete a run and all its results. Also stops the run if it's still executing.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "run_id": {
-                        "type": "string",
-                        "description": "ID of the run to delete."
-                    }
-                },
-                "required": ["run_id"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    toolHandlers.deleteRun(request.arguments()["run_id"] as String)
-                }
-            }
-            .build()
-    }
-
-    private fun buildSetOrganizerNotesTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("set_organizer_notes")
-            .description("Update the notes on an Organizer item.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "description": "The Organizer item ID"
-                    },
-                    "notes": {
-                        "type": "string",
-                        "description": "The new notes content"
-                    }
-                },
-                "required": ["id", "notes"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.setOrganizerNotes(
-                        id = (args["id"] as? Number)?.toInt() ?: 0,
-                        notes = args["notes"] as? String ?: ""
-                    )
-                }
-            }
-            .build()
-    }
-
-    private fun buildSaveToOrganizerTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("save_to_organizer")
-            .description("Save requests from a run to Burp's Organizer with custom notes.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "run_id": {
-                        "type": "string",
-                        "description": "ID of the run to save requests from."
-                    },
-                    "items": {
-                        "type": "string",
-                        "description": "JSON array of objects with request_id (int) and notes (string)"
-                    }
-                },
-                "required": ["run_id", "items"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.saveToOrganizer(
-                        runId = args["run_id"] as String,
-                        items = args["items"] as? String ?: "[]"
-                    )
-                }
-            }
-            .build()
-    }
-
-    private fun buildGenerateCollaboratorPayloadTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("generate_collaborator_payload")
-            .description("Generate a Burp Collaborator payload for out-of-band testing. Returns a unique domain that will capture DNS/HTTP/SMTP interactions.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "metadata": {
-                        "type": "string",
-                        "description": "Description of what this payload tests for (e.g., 'SSRF in webhook URL parameter')"
-                    }
-                },
-                "required": ["metadata"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.generateCollaboratorPayload(
-                        metadata = args["metadata"] as? String ?: ""
-                    )
-                }
-            }
-            .build()
-    }
-
-    private fun buildGetCollaboratorInteractionsTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("get_collaborator_interactions")
-            .description("Retrieve Collaborator interactions (DNS lookups, HTTP requests, etc.) for generated payloads. Returns interaction details including type, timestamp, client IP, and protocol-specific data.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "payloads": {
-                        "type": "array",
-                        "items": { "type": "string" },
-                        "description": "Filter to specific payload domains. Omit to get all interactions from this session."
-                    }
-                }
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    @Suppress("UNCHECKED_CAST")
-                    val payloads = args["payloads"] as? List<String>
-                    toolHandlers.getCollaboratorInteractions(payloads)
-                }
-            }
-            .build()
-    }
-
-    private fun buildSearchResponsesTool(): McpServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("search_responses")
-            .description("Search all responses in a run for a specific string. Returns IDs that can be fetched via turbo://runs/{run_id}/{id}")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The string to search for in response bodies"
-                    },
-                    "run_id": {
-                        "type": "string",
-                        "description": "ID of the run to search."
-                    }
-                },
-                "required": ["query", "run_id"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpServerFeatures.SyncToolSpecification.builder()
-            .tool(tool)
-            .callHandler { _, request ->
-                executeToolWithErrorHandling {
-                    val args = request.arguments()
-                    toolHandlers.searchResponses(
-                        runId = args["run_id"] as String,
-                        query = args["query"] as? String ?: ""
-                    )
-                }
-            }
-            .build()
     }
 
 }
