@@ -45,9 +45,13 @@ class McpToolHandlers(
         )
     }
 
+    private fun runNotFoundMessage(runId: String): String {
+        return if (manager.isEvicted(runId)) "Run was evicted to free memory" else "No run found"
+    }
+
     fun saveToOrganizer(runId: String, items: String): Map<String, Any> {
         val run = manager.getRun(runId)
-            ?: return mapOf("saved" to emptyList<Int>(), "errors" to listOf(mapOf("error" to "No run found")))
+            ?: return mapOf("saved" to emptyList<Int>(), "errors" to listOf(mapOf("error" to runNotFoundMessage(runId))))
 
         val mapper = ObjectMapper()
         val itemList = mapper.readTree(items)
@@ -79,7 +83,7 @@ class McpToolHandlers(
         baseRequest: String,
         endpoint: String,
         baseInput: String,
-        timeoutMs: Long = 60000,
+        timeoutMs: Long = 55000,
         normalizeLineEndings: Boolean = true
     ): Map<String, Any?> {
         val normalized = normalizeScriptLineEndings(script, normalizeLineEndings)
@@ -91,9 +95,14 @@ class McpToolHandlers(
         while (!run.handler.hasFinished()) {
             if (System.currentTimeMillis() - startTime > timeoutMs) {
                 val result = mutableMapOf<String, Any?>(
-                    "status" to "timeout",
+                    "status" to "in_progress",
+                    "message" to "The run is still executing. Read the turbo://runs/${run.id} resource to check status and retrieve results.",
                     "run_id" to run.id,
-                    "result_count" to run.store.count()
+                    "running" to run.handler.isRunning(),
+                    "finished" to run.handler.hasFinished(),
+                    "status_message" to run.handler.statusString(),
+                    "result_count" to run.store.count(),
+                    "created_at" to run.createdAt
                 )
                 normalized.warning?.let { result["warning"] = it }
                 return result
@@ -142,7 +151,7 @@ class McpToolHandlers(
 
     fun searchResponses(runId: String, query: String): Map<String, Any> {
         val run = manager.getRun(runId)
-            ?: return mapOf("error" to "No run found")
+            ?: return mapOf("error" to runNotFoundMessage(runId))
 
         val matches = run.store.getAllRquests()
             .filter { it.response?.contains(query) == true || it.label.contains(query) }

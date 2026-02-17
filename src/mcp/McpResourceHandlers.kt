@@ -1,8 +1,20 @@
 package mcp
 
+import burp.Request
 import burp.SortField
 import java.io.File
 import kotlin.io.path.createTempDirectory
+
+fun Request.toSummaryMap(): Map<String, Any?> = mapOf(
+    "id" to id,
+    "status" to code,
+    "length" to length,
+    "time" to time,
+    "wordcount" to wordcount,
+    "words" to words,
+    "label" to label,
+    "anomaly_rank" to anomalyRank
+)
 
 class McpResourceHandlers(
     private val manager: RunManager,
@@ -10,7 +22,7 @@ class McpResourceHandlers(
     private val desyncMode: () -> Boolean = { false }
 ) {
 
-    private val docTopics = mapOf(
+    val docTopics = mapOf(
         "api-quickstart" to "Quick reference for scripting",
         "engines" to "Engine types (THREADED, BURP, BURP2)",
         "settings" to "Complete parameter reference",
@@ -57,9 +69,14 @@ class McpResourceHandlers(
         return examples
     }
 
+    private fun runNotFoundError(runId: String): Map<String, Any?> {
+        val error = if (manager.isEvicted(runId)) "evicted" else "not_found"
+        return mapOf("error" to error)
+    }
+
     fun getRunStatus(runId: String): Map<String, Any?> {
         val run = manager.getRun(runId)
-            ?: return mapOf("error" to "not_found")
+            ?: return runNotFoundError(runId)
 
         val baseStatus = mapOf(
             "run_id" to run.id,
@@ -73,18 +90,7 @@ class McpResourceHandlers(
         // Include summary when run is finished
         if (run.handler.hasFinished()) {
             val results = run.store.getResults(SortField.ANOMALY_RANK, true, 20, 0)
-            val summary = results.map { req ->
-                mapOf(
-                    "id" to req.id,
-                    "status" to req.code,
-                    "length" to req.length,
-                    "time" to req.time,
-                    "wordcount" to req.wordcount,
-                    "words" to req.words,
-                    "label" to req.label,
-                    "anomaly_rank" to req.anomalyRank
-                )
-            }
+            val summary = results.map { it.toSummaryMap() }
             return baseStatus + mapOf("summary" to summary)
         }
 
@@ -99,7 +105,7 @@ class McpResourceHandlers(
         offset: Int
     ): Map<String, Any?> {
         val run = manager.getRun(runId)
-            ?: return mapOf("error" to "not_found")
+            ?: return runNotFoundError(runId)
 
         val sortField = try {
             SortField.valueOf(sortBy.uppercase())
@@ -110,18 +116,7 @@ class McpResourceHandlers(
         val results = run.store.getResults(sortField, descending, limit, offset)
 
         return mapOf(
-            "results" to results.map { req ->
-                mapOf(
-                    "id" to req.id,
-                    "status" to req.code,
-                    "length" to req.length,
-                    "time" to req.time,
-                    "wordcount" to req.wordcount,
-                    "words" to req.words,
-                    "label" to req.label,
-                    "anomaly_rank" to req.anomalyRank
-                )
-            },
+            "results" to results.map { it.toSummaryMap() },
             "total_count" to run.store.count(),
             "status_codes" to run.store.getUniqueStatusCodes()
         )
@@ -134,7 +129,7 @@ class McpResourceHandlers(
         exportFile: Boolean = false
     ): Map<String, Any?> {
         val run = manager.getRun(runId)
-            ?: return mapOf("error" to "not_found")
+            ?: return runNotFoundError(runId)
 
         val request = run.store.getRequest(requestId)
             ?: return mapOf("error" to "request_not_found")
@@ -306,30 +301,8 @@ class McpResourceHandlers(
         )
     }
 
-    private fun loadDocContent(topic: String): String? {
-        // Try loading from classpath resources first (when running as jar)
-        // docs folder is added as resource root, so files are at /$topic.md
-        val resourcePath = "/$topic.md"
-        javaClass.getResourceAsStream(resourcePath)?.use { stream ->
-            return stream.bufferedReader().readText()
-        }
-
-        // Fall back to file system (for development)
-        val possiblePaths = listOf(
-            "docs/$topic.md",
-            "../docs/$topic.md",
-            "../../docs/$topic.md"
-        )
-
-        for (path in possiblePaths) {
-            val file = File(path)
-            if (file.exists()) {
-                return file.readText()
-            }
-        }
-
-        return null
-    }
+    private fun loadDocContent(topic: String): String? =
+        loadResourceFile("/$topic.md", listOf("docs/$topic.md", "../docs/$topic.md", "../../docs/$topic.md"))
 
     // Example script resources
 
@@ -355,72 +328,17 @@ class McpResourceHandlers(
         )
     }
 
-    private fun loadExampleContent(name: String): String? {
-        // Try loading from classpath resources first (when running as jar)
-        val resourcePath = "/examples/$name.py"
-        javaClass.getResourceAsStream(resourcePath)?.use { stream ->
-            return stream.bufferedReader().readText()
-        }
+    private fun loadExampleContent(name: String): String? =
+        loadResourceFile("/examples/$name.py", listOf(
+            "resources/examples/$name.py", "../resources/examples/$name.py", "../../resources/examples/$name.py"
+        ))
 
-        // Fall back to file system (for development)
-        val possiblePaths = listOf(
-            "resources/examples/$name.py",
-            "../resources/examples/$name.py",
-            "../../resources/examples/$name.py"
-        )
-
-        for (path in possiblePaths) {
+    private fun loadResourceFile(classpathPath: String, filesystemPaths: List<String>): String? {
+        javaClass.getResourceAsStream(classpathPath)?.use { return it.bufferedReader().readText() }
+        for (path in filesystemPaths) {
             val file = File(path)
-            if (file.exists()) {
-                return file.readText()
-            }
+            if (file.exists()) return file.readText()
         }
-
         return null
     }
-
-    // URI parsing utilities
-
-    fun parseRunId(uri: String): String? {
-        val match = Regex("turbo://runs/([^/\\?]+)").find(uri)
-        return match?.groupValues?.get(1)
-    }
-
-    fun parseRequestId(uri: String): Int? {
-        val match = Regex("turbo://runs/[^/]+/(\\d+)").find(uri)
-        return match?.groupValues?.get(1)?.toIntOrNull()
-    }
-
-    fun parseQueryParams(uri: String): Map<String, String> {
-        val queryStart = uri.indexOf('?')
-        if (queryStart == -1) return emptyMap()
-
-        return uri.substring(queryStart + 1)
-            .split('&')
-            .mapNotNull { param ->
-                val parts = param.split('=', limit = 2)
-                if (parts.size == 2) parts[0] to parts[1] else null
-            }
-            .toMap()
-    }
-
-    fun parseDocTopic(uri: String): String? {
-        val match = Regex("turbo://docs/([^/\\?]+)").find(uri)
-        return match?.groupValues?.get(1)
-    }
-
-    fun parseOrganizerId(uri: String): Int? {
-        val match = Regex("turbo://organizer/(\\d+)").find(uri)
-        return match?.groupValues?.get(1)?.toIntOrNull()
-    }
-
-    fun parseOrganizerIds(uri: String): Set<Int> {
-        val match = Regex("turbo://organizer/([\\d,]+)").find(uri)
-            ?: return emptySet()
-        return match.groupValues[1]
-            .split(',')
-            .mapNotNull { it.toIntOrNull() }
-            .toSet()
-    }
-
 }

@@ -23,6 +23,22 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `getRunStatus returns evicted for evicted run`() {
+        val manager = RunManager(maxCompletedRuns = 1)
+        val handlers = McpResourceHandlers(manager)
+        val run1 = manager.startRun()
+        run1.handler.markScriptCompleted()
+        val run2 = manager.startRun()
+        run2.handler.markScriptCompleted()
+        // run1 is now over the cap; starting run3 triggers eviction
+        manager.startRun()
+
+        val result = handlers.getRunStatus(run1.id)
+
+        assertEquals("evicted", result["error"])
+    }
+
+    @Test
     fun `getRunStatus returns run info`() {
         val run = manager.startRun()
 
@@ -101,28 +117,6 @@ class McpResourceHandlersTest {
         val result = handlers.getRequestDetail(run.id, 999)
 
         assertEquals("request_not_found", result["error"])
-    }
-
-    @Test
-    fun `parseUri extracts run_id correctly`() {
-        assertEquals("abc123", handlers.parseRunId("turbo://runs/abc123"))
-        assertEquals("abc123", handlers.parseRunId("turbo://runs/abc123/summary"))
-        assertEquals("current", handlers.parseRunId("turbo://runs/current"))
-        assertNull(handlers.parseRunId("turbo://runs"))
-    }
-
-    @Test
-    fun `parseUri extracts request_id correctly`() {
-        assertEquals(42, handlers.parseRequestId("turbo://runs/abc123/42"))
-        assertNull(handlers.parseRequestId("turbo://runs/abc123/summary"))
-    }
-
-    @Test
-    fun `parseQueryParams extracts parameters`() {
-        val params = handlers.parseQueryParams("turbo://runs/abc/summary?sort_by=status&limit=50")
-
-        assertEquals("status", params["sort_by"])
-        assertEquals("50", params["limit"])
     }
 
     @Test
@@ -400,23 +394,6 @@ class McpResourceHandlersTest {
 
         assertEquals(42, result["id"])
         assertEquals("GET /test HTTP/1.1", result["request"])
-    }
-
-    @Test
-    fun `parseOrganizerId extracts id from URI`() {
-        assertEquals(42, handlers.parseOrganizerId("turbo://organizer/42"))
-        assertEquals(100, handlers.parseOrganizerId("turbo://organizer/100"))
-        assertNull(handlers.parseOrganizerId("turbo://organizer"))
-        assertNull(handlers.parseOrganizerId("turbo://organizer/"))
-    }
-
-    @Test
-    fun `parseOrganizerIds extracts comma-separated ids from URI`() {
-        assertEquals(setOf(1, 2, 3), handlers.parseOrganizerIds("turbo://organizer/1,2,3"))
-        assertEquals(setOf(42), handlers.parseOrganizerIds("turbo://organizer/42"))
-        assertEquals(setOf(10, 20), handlers.parseOrganizerIds("turbo://organizer/10,20?body_limit=100"))
-        assertEquals(emptySet<Int>(), handlers.parseOrganizerIds("turbo://organizer"))
-        assertEquals(emptySet<Int>(), handlers.parseOrganizerIds("turbo://organizer/"))
     }
 
     @Test
