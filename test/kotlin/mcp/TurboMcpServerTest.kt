@@ -11,11 +11,6 @@ class TurboMcpServerTest {
     }
 
     @Test
-    fun `stateless mode is enabled by default`() {
-        assertTrue(TurboMcpServer.STATELESS_MODE)
-    }
-
-    @Test
     fun `server can be created with port`() {
         val server = TurboMcpServer(port = 31337)
         assertNotNull(server)
@@ -52,8 +47,6 @@ class TurboMcpServerTest {
 
     @Test
     fun `server starts and stops with stateless transport`() {
-        assertTrue(TurboMcpServer.STATELESS_MODE, "Stateless mode should be enabled")
-
         val port = findFreePort()
         val server = TurboMcpServer(port = port)
 
@@ -103,7 +96,7 @@ class TurboMcpServerTest {
         val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
 
         // Invoke the stateless handler directly with a URI containing domain query param
-        val result = server.invokeStatelessOrganizerListHandler("turbo://organizer?domain=target.com")
+        val result = server.invokeResourceHandler("turbo://organizer?domain=target.com")
 
         assertEquals(2, result["count"], "Should filter to 2 items for target.com")
         assertEquals(1, result["page"])
@@ -125,7 +118,7 @@ class TurboMcpServerTest {
         val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
 
         // Request page 2
-        val result = server.invokeStatelessOrganizerListHandler("turbo://organizer?domain=target.com&page=2")
+        val result = server.invokeResourceHandler("turbo://organizer?domain=target.com&page=2")
 
         assertEquals(15, result["count"])
         assertEquals(2, result["page"], "Should return page 2")
@@ -183,7 +176,7 @@ class TurboMcpServerTest {
         val runId = startResult["run_id"] as String
 
         // Invoke stateless handler with limit param
-        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?limit=5")
+        val result = server.invokeResourceHandler("turbo://runs/$runId/summary?limit=5")
 
         // The limit should be applied (even if there are 0 results, the param should be parsed)
         assertNotNull(result["results"], "Should have results key")
@@ -203,8 +196,8 @@ class TurboMcpServerTest {
         val runId = startResult["run_id"] as String
 
         // These should not error - if params aren't parsed, invalid sort_by would be ignored
-        val resultById = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?sort_by=id")
-        val resultByLength = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?sort_by=length")
+        val resultById = server.invokeResourceHandler("turbo://runs/$runId/summary?sort_by=id")
+        val resultByLength = server.invokeResourceHandler("turbo://runs/$runId/summary?sort_by=length")
 
         assertNotNull(resultById["results"])
         assertNotNull(resultByLength["results"])
@@ -222,7 +215,7 @@ class TurboMcpServerTest {
         )
         val runId = startResult["run_id"] as String
 
-        val result = server.invokeStatelessRunSummaryHandler("turbo://runs/$runId/summary?offset=10&limit=5")
+        val result = server.invokeResourceHandler("turbo://runs/$runId/summary?offset=10&limit=5")
 
         assertNotNull(result["results"])
         assertNull(result["error"])
@@ -241,7 +234,7 @@ class TurboMcpServerTest {
         val runId = startResult["run_id"] as String
 
         // Request with body_limit - should parse without error even if no results exist
-        val result = server.invokeStatelessRequestDetailHandler("turbo://runs/$runId/1?body_limit=500")
+        val result = server.invokeResourceHandler("turbo://runs/$runId/1?body_limit=500")
 
         // Will return request_not_found since there are no actual results, but should not error on parsing
         assertTrue(result.containsKey("error") || result.containsKey("request"),
@@ -261,10 +254,10 @@ class TurboMcpServerTest {
         val server = TurboMcpServer(port = 31337, organizerProvider = fakeOrganizer)
 
         // Request with small body_limit - response body should be truncated
-        val resultSmall = server.invokeStatelessOrganizerItemHandler("turbo://organizer/42?body_limit=50")
+        val resultSmall = server.invokeResourceHandler("turbo://organizer/42?body_limit=50")
 
         // Request with large body_limit - response body should not be truncated
-        val resultLarge = server.invokeStatelessOrganizerItemHandler("turbo://organizer/42?body_limit=1000")
+        val resultLarge = server.invokeResourceHandler("turbo://organizer/42?body_limit=1000")
 
         assertNull(resultSmall["error"], "Should not error")
         assertNull(resultLarge["error"], "Should not error")

@@ -54,7 +54,7 @@ class McpToolHandlersTest {
     }
 
     @Test
-    fun `startRun returns timeout status when timeout exceeded`() {
+    fun `startRun returns in_progress status with run details when wait exceeded`() {
         val result = handlers.startRun(
             script = """
 def queueRequests(target, wordlists):
@@ -70,12 +70,19 @@ def completed(results):
             timeoutMs = 100  // Very short timeout
         )
 
-        assertEquals("timeout", result["status"])
-        assertNotNull(result["run_id"])  // Run should still be available
+        assertEquals("in_progress", result["status"])
+        assertNotNull(result["run_id"])
+        assertNotNull(result["message"])
+        assertTrue((result["message"] as String).contains("turbo://runs/"))
+        assertTrue(result.containsKey("running"))
+        assertEquals(false, result["finished"])
+        assertNotNull(result["status_message"])
+        assertNotNull(result["result_count"])
+        assertNotNull(result["created_at"])
     }
 
     @Test
-    fun `startRun uses default 60 second timeout`() {
+    fun `startRun uses default 55 second timeout`() {
         val result = handlers.startRun(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
             baseRequest = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n",

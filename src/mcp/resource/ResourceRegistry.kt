@@ -1,7 +1,6 @@
 package mcp.resource
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.modelcontextprotocol.server.McpServerFeatures
 import io.modelcontextprotocol.server.McpStatelessServerFeatures
 import io.modelcontextprotocol.spec.McpSchema
 
@@ -41,30 +40,6 @@ class ResourceRegistry(
                 .build()
 
             McpStatelessServerFeatures.SyncResourceSpecification(resource) { _, request ->
-                val params = def.parseParams(request.uri())
-                val result = def.handler(params)
-                McpSchema.ReadResourceResult(
-                    listOf(McpSchema.TextResourceContents(
-                        request.uri(),
-                        def.mimeType,
-                        jsonMapper.writeValueAsString(result)
-                    ))
-                )
-            }
-        }
-    }
-
-    /** Generate stateful SDK resource specs */
-    fun buildStatefulSpecs(): List<McpServerFeatures.SyncResourceSpecification> {
-        return resources.map { def ->
-            val resource = McpSchema.Resource.builder()
-                .uri(def.baseUri)
-                .name(def.name)
-                .description(def.fullDescription)
-                .mimeType(def.mimeType)
-                .build()
-
-            McpServerFeatures.SyncResourceSpecification(resource) { _, request ->
                 val params = def.parseParams(request.uri())
                 val result = def.handler(params)
                 McpSchema.ReadResourceResult(

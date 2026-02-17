@@ -178,18 +178,4 @@ class ResourceRegistryTest {
         assertTrue(description.contains("default: 1"))
     }
 
-    @Test
-    fun `buildStatefulSpecs generates specs for all definitions`() {
-        val registry = ResourceRegistry(ObjectMapper())
-        registry.register(resource("turbo://runs") {
-            name = "List runs"
-            description = "List all runs"
-            handle { mapOf("runs" to emptyList<Any>()) }
-        })
-
-        val specs = registry.buildStatefulSpecs()
-
-        assertEquals(1, specs.size)
-        assertEquals("turbo://runs", specs[0].resource().uri())
-    }
 }

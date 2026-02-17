@@ -2,6 +2,27 @@ package mcp.resource
 
 import mcp.McpResourceHandlers
 
+private fun ResourceBuilder.requestDetailParams(handlers: McpResourceHandlers) {
+    queryInt("body_limit", default = 100, description = "chars of body to include")
+    queryString("export", description = "set to 'file' to write to temp files")
+    handle { params ->
+        handlers.getRequestDetail(
+            runId = params.path("run_id"),
+            requestId = params.path("id").toInt(),
+            bodyLimit = params.int("body_limit")!!,
+            exportFile = params.string("export") == "file"
+        )
+    }
+}
+
+private val acronyms = setOf("api")
+
+private fun formatDocName(topic: String): String =
+    topic.split("-").joinToString(" ") { word ->
+        if (word in acronyms) word.uppercase()
+        else word.replaceFirstChar { it.uppercase() }
+    }
+
 fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefinition> = listOf(
 
     // === Run Resources ===
@@ -35,32 +56,14 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
     resource("turbo://runs/{run_id}/{id}") {
         name = "Result detail by numeric ID"
         description = "Get full HTTP request/response for result {id} from run {run_id}. Example: turbo://runs/abc123/42"
-        queryInt("body_limit", default = 100, description = "chars of body to include")
-        queryString("export", description = "set to 'file' to write to temp files")
-        handle { params ->
-            handlers.getRequestDetail(
-                runId = params.path("run_id"),
-                requestId = params.path("id").toInt(),
-                bodyLimit = params.int("body_limit")!!,
-                exportFile = params.string("export") == "file"
-            )
-        }
+        requestDetailParams(handlers)
     },
 
     // Alias for clients that hallucinate /requests/ in the path
     resource("turbo://runs/{run_id}/requests/{id}") {
         name = "Result detail (alias)"
         description = "Alias for turbo://runs/{run_id}/{id} - prefer the shorter form"
-        queryInt("body_limit", default = 100, description = "chars of body to include")
-        queryString("export", description = "set to 'file' to write to temp files")
-        handle { params ->
-            handlers.getRequestDetail(
-                runId = params.path("run_id"),
-                requestId = params.path("id").toInt(),
-                bodyLimit = params.int("body_limit")!!,
-                exportFile = params.string("export") == "file"
-            )
-        }
+        requestDetailParams(handlers)
     },
 
     // === Organizer Resources ===
@@ -94,60 +97,18 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
                 bodyLimit = params.int("body_limit")!!
             )
         }
-    },
+    }
 
-    // === Documentation Resources ===
+) + // === Documentation Resources ===
 
-    resource("turbo://docs/api-quickstart") {
-        name = "API Quickstart"
-        description = "Quick reference for scripting"
+handlers.docTopics.map { (topic, description) ->
+    resource("turbo://docs/$topic") {
+        name = formatDocName(topic)
+        this.description = description
         mimeType = "text/markdown"
-        handle { handlers.getDoc("api-quickstart") }
-    },
-
-    resource("turbo://docs/engines") {
-        name = "Engine Types"
-        description = "Engine types (THREADED, BURP, BURP2)"
-        mimeType = "text/markdown"
-        handle { handlers.getDoc("engines") }
-    },
-
-    resource("turbo://docs/settings") {
-        name = "Settings Reference"
-        description = "Complete parameter reference"
-        mimeType = "text/markdown"
-        handle { handlers.getDoc("settings") }
-    },
-
-    resource("turbo://docs/race-conditions") {
-        name = "Race Conditions"
-        description = "Race condition testing with gates"
-        mimeType = "text/markdown"
-        handle { handlers.getDoc("race-conditions") }
-    },
-
-    resource("turbo://docs/response-processing") {
-        name = "Response Processing"
-        description = "Handling and filtering responses"
-        mimeType = "text/markdown"
-        handle { handlers.getDoc("response-processing") }
-    },
-
-    resource("turbo://docs/decorators") {
-        name = "Decorators"
-        description = "Response decorator reference"
-        mimeType = "text/markdown"
-        handle { handlers.getDoc("decorators") }
-    },
-
-    resource("turbo://docs/misc") {
-        name = "Misc Utilities"
-        description = "Wordlists and utilities"
-        mimeType = "text/markdown"
-        handle { handlers.getDoc("misc") }
-    },
-
-    // === Example Script Resources ===
+        handle { handlers.getDoc(topic) }
+    }
+} + listOf( // === Example Script Resources ===
 
     resource("turbo://examples") {
         name = "Example Scripts"
