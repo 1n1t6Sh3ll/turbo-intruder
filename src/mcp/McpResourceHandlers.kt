@@ -33,41 +33,16 @@ class McpResourceHandlers(
     )
 
     // Auto-discovered from resources/examples/
-    private val discoveredExamples: Set<String> by lazy { discoverExamples() }
-
-    private fun discoverExamples(): Set<String> {
-        val examples = mutableSetOf<String>()
-
-        // Try classpath resources first (when running as jar)
-        // The examples directory is added as a resource root
-        javaClass.getResourceAsStream("/examples/")?.use { stream ->
-            stream.bufferedReader().readLines()
-                .filter { it.endsWith(".py") && it != "__init__.py" }
-                .map { it.removeSuffix(".py") }
-                .forEach { examples.add(it) }
-        }
-
-        // Fall back to file system (for development)
-        if (examples.isEmpty()) {
-            val possiblePaths = listOf(
-                "resources/examples",
-                "../resources/examples",
-                "../../resources/examples"
-            )
-            for (path in possiblePaths) {
-                val dir = File(path)
-                if (dir.exists() && dir.isDirectory) {
-                    dir.listFiles()
-                        ?.filter { it.extension == "py" && it.name != "__init__.py" }
-                        ?.map { it.nameWithoutExtension }
-                        ?.forEach { examples.add(it) }
-                    break
-                }
-            }
-        }
-
-        return examples
-    }
+    private val discoveredExamples: Set<String> = setOf(
+        "0cl-exploit", "0cl-find-offset", "0cl-poc",
+        "apis", "basic", "benchmark-h1-race", "benchmark-h2-race",
+        "burpIntegration", "customSortOrder", "debug", "default",
+        "email-link-extraction", "http2", "infinite", "micro-crawl",
+        "misc", "multiHost", "multipleParameters", "outputToFile",
+        "partialReadCallback", "pinwheel", "race-multi-endpoint",
+        "race-single-packet-attack", "ratelimit", "recursive",
+        "specialWordlists", "test", "timing", "timingAttackWithState"
+    )
 
     private fun runNotFoundError(runId: String): Map<String, Any?> {
         val error = if (manager.isEvicted(runId)) "evicted" else "not_found"
