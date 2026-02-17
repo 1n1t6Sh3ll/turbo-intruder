@@ -45,7 +45,8 @@ def queueRequests(target, wordlists):
                            concurrentConnections=1,
                            requestsPerConnection=100,
                            pipeline=False,
-                           engine=Engine.BURP
+                           engine=Engine.BURP,
+                           maxQueueSize=MAX
                            )
 
     queue_path(engine, target.req, '/', skip_static=False)
