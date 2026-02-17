@@ -1,7 +1,5 @@
 package burp
 
-import java.util.concurrent.CopyOnWriteArrayList
-
 enum class SortField {
     ID,
     STATUS,
@@ -13,26 +11,26 @@ enum class SortField {
 }
 
 class ResultStore : OutputHandler {
-    private val results = CopyOnWriteArrayList<Request>()
+    private val results = ArrayList<Request>()
 
     override fun add(req: Request) {
-        results.add(req)
+        synchronized(results) { results.add(req) }
     }
 
-    override fun getAllRquests(): List<Request> = results.toList()
+    override fun getAllRquests(): List<Request> = synchronized(results) { ArrayList(results) }
 
-    fun count(): Int = results.size
+    fun count(): Int = synchronized(results) { results.size }
 
     fun clear() {
-        results.clear()
+        synchronized(results) { results.clear() }
     }
 
     fun getRequest(id: Int): Request? {
-        return results.find { it.id == id }
+        return synchronized(results) { results.find { it.id == id } }
     }
 
     fun getRequestByIndex(index: Int): Request? {
-        return results.getOrNull(index)
+        return synchronized(results) { results.getOrNull(index) }
     }
 
     fun getResults(
@@ -41,8 +39,10 @@ class ResultStore : OutputHandler {
         limit: Int = 100,
         offset: Int = 0
     ): List<Request> {
+        val snapshot = synchronized(results) { ArrayList(results) }
+
         val comparator: Comparator<Request> = when (sortBy) {
-            SortField.ID -> compareBy { results.indexOf(it) }
+            SortField.ID -> compareBy { snapshot.indexOf(it) }
             SortField.STATUS -> compareBy { it.code }
             SortField.LENGTH -> compareBy { it.length }
             SortField.TIME -> compareBy { it.time }
@@ -52,15 +52,15 @@ class ResultStore : OutputHandler {
         }
 
         val sorted = if (descending) {
-            results.sortedWith(comparator.reversed())
+            snapshot.sortedWith(comparator.reversed())
         } else {
-            results.sortedWith(comparator)
+            snapshot.sortedWith(comparator)
         }
 
         return sorted.drop(offset).take(limit)
     }
 
     fun getUniqueStatusCodes(): Set<Int> {
-        return results.map { it.code }.toSet()
+        return synchronized(results) { results.map { it.code }.toSet() }
     }
 }
