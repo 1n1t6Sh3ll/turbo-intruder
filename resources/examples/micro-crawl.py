@@ -17,10 +17,13 @@ WORDLIST = [
     'dashboard', 'portal', 'app', 'assets',
 ]
 
+DETECT_REFLECTION = True
+
 SKIP_EXT = ('.png', '.jpg', '.jpeg', '.gif', '.css', '.js', '.woff', '.woff2',
             '.svg', '.ico', '.ttf', '.eot', '.mp4', '.mp3', '.webp', '.avif')
 PATH_RE = re.compile(r'(?<!/)/[a-zA-Z0-9._\-][a-zA-Z0-9._\-/]*(?:\?[^\s"\'<>]*)?')
 MAX = 500
+CANARY = randstr()
 
 seen = set()
 count = 0
@@ -37,7 +40,10 @@ def queue_path(engine, template, path, skip_static=True):
         return
     seen.add(dedup)
     count += 1
-    engine.queue(template, path, label=path)
+    if DETECT_REFLECTION:
+        sep = '&' if '?' in path else '?'
+        path = path + sep + 'z=' + CANARY
+    engine.queue(template, path, label=dedup)
 
 
 def queueRequests(target, wordlists):
@@ -63,4 +69,6 @@ def handleResponse(req, interesting):
         queue_path(req.engine, req.template, path)
 
     if req.status != 404:
+        if DETECT_REFLECTION and CANARY in (req.response or ''):
+            req.label = req.label + ' reflection'
         table.add(req)
