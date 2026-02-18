@@ -3,6 +3,7 @@ package mcp
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Assertions.*
+import java.io.File
 
 class McpResourceHandlersTest {
 
@@ -998,5 +999,27 @@ class McpResourceHandlersTest {
         assertTrue(names.contains("email-link-extraction"), "Should discover email-link-extraction.py")
         // Should NOT include __init__.py
         assertFalse(names.contains("__init__"), "Should not include __init__.py")
+    }
+
+    @Test
+    fun `hardcoded example list matches files in resources examples directory`() {
+        val dir = File("resources/examples")
+        assertTrue(dir.exists(), "resources/examples directory should exist")
+
+        val filesOnDisk = dir.listFiles()!!
+            .filter { it.extension == "py" && it.name != "__init__.py" }
+            .map { it.nameWithoutExtension }
+            .toSet()
+
+        @Suppress("UNCHECKED_CAST")
+        val listed = (handlers.listExamples()["examples"] as List<Map<String, Any?>>)
+            .map { it["name"] as String }
+            .toSet()
+
+        val missing = filesOnDisk - listed
+        val extra = listed - filesOnDisk
+
+        assertTrue(missing.isEmpty(), "Examples on disk but not in hardcoded list: $missing")
+        assertTrue(extra.isEmpty(), "Examples in hardcoded list but not on disk: $extra")
     }
 }
