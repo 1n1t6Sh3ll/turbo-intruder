@@ -63,10 +63,14 @@ def queueRequests(target, wordlists):
                            maxQueueSize=MAX
                            )
 
-    queue_path(engine, target.req, '/')
+    from burp.api.montoya.http.message.requests import HttpRequest
+    base = HttpRequest.httpRequestFromUrl(target.endpoint + "/").toString()
+    template = base.replace("GET / ", "GET %s ", 1)
+
+    queue_path(engine, template, '/')
     for word in WORDLIST:
         path = word if word.startswith('/') else '/' + word
-        queue_path(engine, target.req, path)
+        queue_path(engine, template, path)
 
 
 def handleResponse(req, interesting):
