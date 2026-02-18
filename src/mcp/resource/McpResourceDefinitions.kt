@@ -6,9 +6,27 @@ private fun ResourceBuilder.requestDetailParams(handlers: McpResourceHandlers) {
     queryInt("body_limit", default = 100, description = "chars of body to include")
     queryString("export", description = "set to 'file' to write to temp files")
     handle { params ->
+        val id = params.path("id")
+        val requestId = id.toIntOrNull()
+
+        if (requestId == null) {
+            // SDK routing bug: turbo://runs/{run_id}/summary can be misrouted here
+            // because {id} matches "summary". Delegate to the correct handler.
+            if (id == "summary") {
+                return@handle handlers.getResults(
+                    runId = params.path("run_id"),
+                    sortBy = params.string("sort_by") ?: "id",
+                    descending = params.bool("descending") ?: true,
+                    limit = params.int("limit") ?: 100,
+                    offset = params.int("offset") ?: 0
+                )
+            }
+            return@handle mapOf("error" to "invalid_request_id", "message" to "Expected numeric ID, got: $id")
+        }
+
         handlers.getRequestDetail(
             runId = params.path("run_id"),
-            requestId = params.path("id").toInt(),
+            requestId = requestId,
             bodyLimit = params.int("body_limit")!!,
             exportFile = params.string("export") == "file"
         )

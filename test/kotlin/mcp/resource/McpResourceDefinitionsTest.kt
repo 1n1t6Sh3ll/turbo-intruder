@@ -156,6 +156,25 @@ class McpResourceDefinitionsTest {
         assertEquals(0, params.int("offset"))
     }
 
+    @Test
+    fun `result detail handler delegates to summary when id is summary`() {
+        // When the MCP SDK misroutes turbo://runs/{run_id}/summary to the {id} handler,
+        // the handler should delegate to the summary handler instead of crashing
+        val definitions = createResourceDefinitions(handlers)
+        val def = definitions.find { it.uriPattern == "turbo://runs/{run_id}/{id}" }!!
+
+        // Simulate the SDK misrouting /summary?limit=5 to the {id} handler
+        val params = def.parseParams("turbo://runs/nonexistent/summary?limit=5")
+        val result = def.handler(params)
+
+        // Should delegate to summary handler (returns not_found for nonexistent run),
+        // not crash with NumberFormatException
+        assertTrue(
+            result.containsKey("results") || result["error"] == "not_found",
+            "Should delegate to summary handler, got: $result"
+        )
+    }
+
     // Example script resource tests
 
     @Test

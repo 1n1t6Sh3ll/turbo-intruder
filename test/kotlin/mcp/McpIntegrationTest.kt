@@ -103,16 +103,14 @@ class McpIntegrationTest {
     }
 
     @Test
-    fun `MCP URI templates must not have ambiguous matches`() {
-        // This test verifies that our MCP resource templates don't have collision issues
-        // where multiple templates match the same URI.
-        //
-        // The MCP SDK uses findFirst() on template matches, so if both:
+    fun `MCP SDK has URI template collision between summary and id`() {
+        // The MCP SDK doesn't support URI template specificity, so both:
         //   turbo://runs/{run_id}/summary
         //   turbo://runs/{run_id}/{id}
-        // match "turbo://runs/current/summary", routing depends on registration order.
+        // match "turbo://runs/current/summary". The SDK may route to either handler.
         //
-        // This test documents the collision so we don't accidentally break routing.
+        // This is worked around in the {id} handler (requestDetailParams) which
+        // delegates to the summary handler when id == "summary".
 
         val summaryTemplate = DefaultMcpUriTemplateManager("turbo://runs/{run_id}/summary")
         val resultTemplate = DefaultMcpUriTemplateManager("turbo://runs/{run_id}/{id}")
@@ -120,56 +118,14 @@ class McpIntegrationTest {
         val summaryUri = "turbo://runs/current/summary"
         val resultUri = "turbo://runs/current/42"
 
-        // Summary template should match summary URI
-        assertTrue(summaryTemplate.matches(summaryUri),
-            "Summary template should match summary URI")
+        assertTrue(summaryTemplate.matches(summaryUri))
+        assertTrue(resultTemplate.matches(resultUri))
 
-        // Result template should match result URI
-        assertTrue(resultTemplate.matches(resultUri),
-            "Result template should match result URI")
-
-        // BUG: Result template also matches summary URI because {id} matches "summary"
-        // This test documents this known issue - if it starts failing, the SDK behavior changed
+        // Collision: {id} also matches "summary"
         assertTrue(resultTemplate.matches(summaryUri),
-            "Result template incorrectly matches summary URI - this is a known collision. " +
-            "If this assertion fails, the MCP SDK may have added type constraints to templates.")
+            "If this fails, the MCP SDK added type constraints and the workaround may be removable")
 
-        // Summary template should NOT match result URI (summary is literal, not a pattern)
-        assertFalse(summaryTemplate.matches(resultUri),
-            "Summary template should not match numeric result URI")
-    }
-
-    @Test
-    fun `MCP resource template registration order prevents summary collision`() {
-        // The MCP SDK uses findFirst() when matching templates, so order matters.
-        // This test verifies that summary template is registered before result template,
-        // ensuring /summary routes correctly even though {id} would also match it.
-        //
-        // If this test fails, check buildStatelessResourceSpecifications() in TurboMcpServer.kt
-        // to ensure buildStatelessRunResultsResourceTemplate (summary) comes before
-        // buildStatelessRequestDetailResourceTemplate (result/{id}).
-
-        val summaryTemplate = DefaultMcpUriTemplateManager("turbo://runs/{run_id}/summary")
-        val resultTemplate = DefaultMcpUriTemplateManager("turbo://runs/{run_id}/{id}")
-
-        // Simulate SDK's template matching with our registration order
-        val templates = listOf(
-            "turbo://runs/{run_id}/summary" to "summary_handler",
-            "turbo://runs/{run_id}/{id}" to "result_handler"
-        )
-
-        val summaryUri = "turbo://runs/current/summary"
-
-        // Find first matching template (mimics SDK behavior)
-        val matchedHandler = templates
-            .firstOrNull { (template, _) ->
-                DefaultMcpUriTemplateManager(template).matches(summaryUri)
-            }
-            ?.second
-
-        assertEquals("summary_handler", matchedHandler,
-            "Summary URI should match summary_handler first due to registration order. " +
-            "If this fails, the template order in TurboMcpServer may have changed.")
+        assertFalse(summaryTemplate.matches(resultUri))
     }
 
     @Tag("integration")
