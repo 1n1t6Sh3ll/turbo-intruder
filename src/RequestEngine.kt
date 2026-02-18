@@ -56,6 +56,7 @@ abstract class RequestEngine: IExtensionStateListener {
         }
 
         internalSettings["calculateAnomalyRank"] = true
+        internalSettings["anomalyRankAlgorithm"] = "burp"
     }
 
     override fun extensionUnloaded() {
@@ -305,51 +306,45 @@ abstract class RequestEngine: IExtensionStateListener {
         }
 
         try {
+            val totalStart = System.currentTimeMillis()
+
+            val t0 = System.currentTimeMillis()
             val allRequests = outputHandler.getAllRquests()
             if (allRequests.isEmpty()) {
                 return
             }
+            Utils.err("Anomaly rank: getAllRequests=${System.currentTimeMillis() - t0}ms (${allRequests.size} requests)")
 
             // Convert Request objects to Montoya HttpRequestResponse objects, preserving mapping
+            val t1 = System.currentTimeMillis()
             val requestsWithMontoya = allRequests.mapNotNull { req ->
                 req.getMontoyaRequest()?.let { montoya -> req to montoya }
             }
             if (requestsWithMontoya.isEmpty()) {
                 return
             }
+            Utils.err("Anomaly rank: convertToMontoya=${System.currentTimeMillis() - t1}ms")
 
-            try {
-                // Calculate rankings using Burp's RankingUtils
-                val startTime = System.currentTimeMillis()
-                Utils.out("Calculating anomaly rankings...")
-                val montoyaRequests = requestsWithMontoya.map { it.second }
-                val rankedRequests = Utils.montoyaApi.utilities().rankingUtils().rank(montoyaRequests)
+            val algorithm = internalSettings["anomalyRankAlgorithm"] as? String ?: "burp"
+            val t2 = System.currentTimeMillis()
 
-                Utils.out("Mapping anomaly rankings...")
-                // Map rankings back to the correct Request objects
-                for (i in requestsWithMontoya.indices) {
-                    if (i < rankedRequests.size) {
-                        val floatRank = rankedRequests[i].rank()
-                        requestsWithMontoya[i].first.anomalyRank = floatRank
-                    }
+            if (algorithm == "local") {
+                // Try to load and invoke the local anomaly ranker via reflection
+                try {
+                    val rankerClass = Class.forName("burp.LocalAnomalyRanker")
+                    val rankMethod = rankerClass.getMethod("rank", List::class.java)
+                    rankMethod.invoke(null, requestsWithMontoya)
+                    Utils.err("Anomaly rank: localAlgorithm=${System.currentTimeMillis() - t2}ms")
+                } catch (e: ClassNotFoundException) {
+                    Utils.err("LocalAnomalyRanker not found, falling back to burp algorithm")
+                    runBurpRanking(requestsWithMontoya, t2)
                 }
-                val duration = System.currentTimeMillis() - startTime
-                Utils.out("...ranked ${montoyaRequests.size} entries in ${duration}ms")
-            } catch (e: NoSuchMethodError) {
-                Utils.err("Anomaly ranking API not available in Burp versions below 2025.10")
-                // Set all ranks to 0 as fallback
-                for (request in allRequests) {
-                    request.anomalyRank = 0
-                }
-            } catch (e: NoClassDefFoundError) {
-                Utils.err("Anomaly ranking API not available in Burp versions below 2025.10")
-                // Set all ranks to 0 as fallback
-                for (request in allRequests) {
-                    request.anomalyRank = 0
-                }
+            } else {
+                runBurpRanking(requestsWithMontoya, t2)
             }
 
             // Notify the table model to update the UI
+            val t3 = System.currentTimeMillis()
             requestTable?.let { table ->
                 table.model.updateRankings()
 
@@ -360,9 +355,35 @@ abstract class RequestEngine: IExtensionStateListener {
                     }
                 }
             }
+            Utils.err("Anomaly rank: tableUpdate=${System.currentTimeMillis() - t3}ms")
+            Utils.err("Anomaly rank: total=${System.currentTimeMillis() - totalStart}ms")
         } catch (e: Exception) {
             Utils.err("Error calculating anomaly rankings: ${e.message}")
             e.printStackTrace()
+        }
+    }
+
+    private fun runBurpRanking(requestsWithMontoya: List<Pair<Request, burp.api.montoya.http.message.HttpRequestResponse>>, startTime: Long) {
+        try {
+            val montoyaRequests = requestsWithMontoya.map { it.second }
+            val rankedRequests = Utils.montoyaApi.utilities().rankingUtils().rank(montoyaRequests)
+
+            for (i in requestsWithMontoya.indices) {
+                if (i < rankedRequests.size) {
+                    requestsWithMontoya[i].first.anomalyRank = rankedRequests[i].rank()
+                }
+            }
+            Utils.err("Anomaly rank: burpAlgorithm=${System.currentTimeMillis() - startTime}ms")
+        } catch (e: NoSuchMethodError) {
+            Utils.err("Anomaly ranking API not available in Burp versions below 2025.10")
+            for ((request, _) in requestsWithMontoya) {
+                request.anomalyRank = 0
+            }
+        } catch (e: NoClassDefFoundError) {
+            Utils.err("Anomaly ranking API not available in Burp versions below 2025.10")
+            for ((request, _) in requestsWithMontoya) {
+                request.anomalyRank = 0
+            }
         }
     }
 
@@ -392,11 +413,16 @@ abstract class RequestEngine: IExtensionStateListener {
             return false
         }
 
+        // Populate IResponseVariations for local anomaly ranking algorithm
+        if (internalSettings["anomalyRankAlgorithm"] == "local") {
+            req.details = Utils.callbacks.helpers.analyzeResponseVariations(response)
+        }
+
         if (req.learnBoring == 0 && baselines.isEmpty()) {
             return true
         }
 
-        val resp = Utils.callbacks.helpers.analyzeResponseVariations(response)
+        val resp = req.details ?: Utils.callbacks.helpers.analyzeResponseVariations(response)
 
         // fixme might screw over the user if they try to add multiple overlapping fingerprints?
         for(base in baselines) {
