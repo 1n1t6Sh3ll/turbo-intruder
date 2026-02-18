@@ -1,6 +1,6 @@
 # Infinite queuing example - uses while True so items are queued on-demand.
 # engine.queue() blocks when the queue is full, providing natural backpressure.
-# WARNING: never use 'for i in range(large_number)' - it causes a memory leak.
+# WARNING: never use 'for i in range(large_number)' - use xrange() instead to avoid a memory leak.
 def queueRequests(target, wordlists):
     engine = RequestEngine(endpoint=target.endpoint,
                            concurrentConnections=5,

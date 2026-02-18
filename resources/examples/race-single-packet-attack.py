@@ -10,7 +10,7 @@ def queueRequests(target, wordlists):
 
     # the 'gate' argument withholds part of each request until openGate is invoked
     # if you see a negative timestamp, the server responded before the request was complete
-    for i in range(20):
+    for i in xrange(20):
         engine.queue(target.req, gate='race1')
 
     # once every 'race1' tagged request has been queued

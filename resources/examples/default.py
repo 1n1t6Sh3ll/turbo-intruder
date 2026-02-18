@@ -7,7 +7,7 @@ def queueRequests(target, wordlists):
                            engine=Engine.THREADED
                            )
 
-    for x in range(10, 20):
+    for x in xrange(10, 20):
         engine.queue(target.req, x)
 
     for word in open('/usr/share/dict/words'):

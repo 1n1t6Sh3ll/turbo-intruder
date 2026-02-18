@@ -23,10 +23,10 @@ Cache-Control: max-age=0
 
 '''
 
-    for i in range(10):
+    for i in xrange(10):
         gate_id = str(i)
 
-        for x in range(BATCH_SIZE):
+        for x in xrange(BATCH_SIZE):
             engine.queue(req, '0.000', gate=gate_id)
 
         engine.openGate(gate_id)
@@ -43,12 +43,12 @@ def completed(reqsFromTable):
     diffs = []
     time.sleep(1)
     print len(reqsFromTable)
-    for i in range(len(reqsFromTable)):
+    for i in xrange(len(reqsFromTable)):
         if i % BATCH_SIZE != 0:
             continue
 
         entries = []
-        for x in range(BATCH_SIZE):
+        for x in xrange(BATCH_SIZE):
             entries.append(float(reqsFromTable[i+x].label))
 
         entries.sort()

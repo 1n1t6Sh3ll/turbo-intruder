@@ -7,7 +7,7 @@ def queueRequests(target, wordlists):
 
     engine.userState['base_times'] = []
 
-    for i in range(20):
+    for i in xrange(20):
         engine.queue(target.req, randstr(i), label='benchmark')
 
     usernames = ['test', 'foo', 'albinowax', 'bar']

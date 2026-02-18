@@ -8,7 +8,7 @@ def queueRequests(target, wordlists):
     # generate a collaborator domain - interactions will appear in the Collaborator tab
     collabDomain = api.collaborator().defaultPayloadGenerator().generatePayload()
 
-    for i in range(3, 8):
+    for i in xrange(3, 8):
         engine.queue(target.req, randstr(i), learn=1)
 
     for word in open('/usr/share/dict/words'):

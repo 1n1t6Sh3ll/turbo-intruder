@@ -19,14 +19,14 @@ def queueRequests(target, wordlists):
                            engine=Engine.BURP
                            )
 
-    for i in range(3,8):
+    for i in xrange(3,8):
         engine.queue(target.req, randstr(i), learn=1)
         engine.queue(target.req, target.baseInput, learn=2)
 
     users=loadFile('users.txt')
 
     lists = []
-    for i in range(1,len(users)+1):
+    for i in xrange(1,len(users)+1):
         filename='words'+str(i)+'.txt'
         words=loadFile(filename)
         lists.append(words)

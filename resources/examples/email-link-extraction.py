@@ -23,7 +23,7 @@ email=%s
 
     token = 'just-starting'
 
-    for i in range(50000):
+    for i in xrange(50000):
         gate = 'race'+str(i)
         collab = callbacks.createBurpCollaboratorClientContext()
 

@@ -6,7 +6,7 @@ def queueRequests(target, wordlists):
                            pipeline=False
                            )
 
-    for i in range(3, 8):
+    for i in xrange(3, 8):
         engine.queue(target.req, randstr(i), learn=1)
         engine.queue(target.req, target.baseInput, learn=2)
 

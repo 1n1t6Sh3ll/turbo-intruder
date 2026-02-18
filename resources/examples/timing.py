@@ -30,7 +30,7 @@ def queueRequests(target, wordlists):
     right_request = request.replace('%s', RIGHT_PAYLOAD)
 
     # alternate order to prevent order-FPs - see 'sticky ordering problem'
-    for i in range(REPEATS):
+    for i in xrange(REPEATS):
         gate_id = str(i)
         if (i % 2 == 1):
             engine.queue(left_request, gate=gate_id, label='left-first')

@@ -20,7 +20,7 @@ Content-Length: 0
 
 '''
 
-    for i in range(5):
+    for i in xrange(5):
         engine.queue(req1, 'search', gate='race1')
         engine.queue(req2, 'hidden', gate='race1')
 
