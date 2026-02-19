@@ -56,7 +56,7 @@ abstract class RequestEngine: IExtensionStateListener {
         }
 
         internalSettings["calculateAnomalyRank"] = true
-        internalSettings["anomalyRankAlgorithm"] = "burp"
+        internalSettings["anomalyRankAlgorithm"] = "local"
     }
 
     override fun extensionUnloaded() {
@@ -320,6 +320,7 @@ abstract class RequestEngine: IExtensionStateListener {
             val requestsWithMontoya = allRequests.mapNotNull { req ->
                 req.getMontoyaRequest()?.let { montoya -> req to montoya }
             }
+            allRequests.filter { it.getMontoyaRequest() == null }.forEach { it.anomalyRank = -1 }
             if (requestsWithMontoya.isEmpty()) {
                 return
             }

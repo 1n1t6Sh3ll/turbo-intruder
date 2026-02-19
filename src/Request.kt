@@ -94,6 +94,9 @@ open class Request(val template: String, val words: List<String?>, val learnBori
         montoyaReq?.let {
             return montoyaReq
         }
+        if (response == null || !(response!!.startsWith("HTTP/") || response!!.startsWith(":status"))) {
+            return null
+        }
         return Utilities.buildMontoyaResp(Resp(getBurpRequest()))
     }
 
