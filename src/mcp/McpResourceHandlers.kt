@@ -72,6 +72,12 @@ class McpResourceHandlers(
         return baseStatus
     }
 
+    fun getRunScript(runId: String): Map<String, Any?> {
+        val run = manager.getRun(runId)
+            ?: return runNotFoundError(runId)
+        return mapOf("script" to run.handler.code)
+    }
+
     fun getResults(
         runId: String,
         sortBy: String,

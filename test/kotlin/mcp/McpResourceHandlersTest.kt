@@ -102,6 +102,22 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `getRunScript returns script for run`() {
+        val run = manager.startRun()
+        run.handler.code = "def queueRequests(target, wordlists):\n    pass"
+
+        val result = handlers.getRunScript(run.id)
+
+        assertEquals("def queueRequests(target, wordlists):\n    pass", result["script"])
+    }
+
+    @Test
+    fun `getRunScript returns error for nonexistent run`() {
+        val result = handlers.getRunScript("nonexistent")
+        assertEquals("not_found", result["error"])
+    }
+
+    @Test
     fun `getResults returns empty list when no results`() {
         val run = manager.startRun()
 

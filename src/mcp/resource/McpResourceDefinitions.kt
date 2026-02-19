@@ -21,6 +21,9 @@ private fun ResourceBuilder.requestDetailParams(handlers: McpResourceHandlers) {
                     offset = params.int("offset") ?: 0
                 )
             }
+            if (id == "script") {
+                return@handle handlers.getRunScript(params.path("run_id"))
+            }
             return@handle mapOf("error" to "invalid_request_id", "message" to "Expected numeric ID, got: $id")
         }
 
@@ -50,6 +53,15 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
         description = "Get detailed status of a specific run including running state, result count, and status message"
         handle { params ->
             handlers.getRunStatus(params.path("run_id"))
+        }
+    },
+
+    resource("turbo://runs/{run_id}/script") {
+        name = "Run script"
+        description = "Get the Python script used for a run"
+        mimeType = "text/x-python"
+        handle { params ->
+            handlers.getRunScript(params.path("run_id"))
         }
     },
 
