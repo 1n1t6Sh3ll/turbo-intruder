@@ -404,7 +404,8 @@ class TurboMcpServer(
                 "type": "object",
                 "properties": {
                     "query": { "type": "string", "description": "The string to search for in response bodies" },
-                    "run_id": { "type": "string", "description": "ID of the run to search." }
+                    "run_id": { "type": "string", "description": "ID of the run to search." },
+                    "search_in": { "type": "string", "enum": ["all", "labels", "responses"], "description": "Where to search: 'all' (default) searches both labels and response bodies, 'labels' searches only labels, 'responses' searches only response bodies" }
                 },
                 "required": ["query", "run_id"]
             }
@@ -416,7 +417,8 @@ class TurboMcpServer(
                 val args = request.arguments()
                 toolHandlers.searchResponses(
                     runId = args["run_id"] as String,
-                    query = args["query"] as? String ?: ""
+                    query = args["query"] as? String ?: "",
+                    searchIn = args["search_in"] as? String ?: "all"
                 )
             }
         }

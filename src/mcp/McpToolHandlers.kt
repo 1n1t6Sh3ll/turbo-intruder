@@ -149,12 +149,18 @@ class McpToolHandlers(
         return mapOf("status" to manager.deleteRun(runId))
     }
 
-    fun searchResponses(runId: String, query: String): Map<String, Any> {
+    fun searchResponses(runId: String, query: String, searchIn: String = "all"): Map<String, Any> {
         val run = manager.getRun(runId)
             ?: return mapOf("error" to runNotFoundMessage(runId))
 
         val matches = run.store.getAllRquests()
-            .filter { it.response?.contains(query) == true || it.label.contains(query) }
+            .filter { req ->
+                when (searchIn) {
+                    "labels" -> req.label.contains(query)
+                    "responses" -> req.response?.contains(query) == true
+                    else -> req.response?.contains(query) == true || req.label.contains(query)
+                }
+            }
             .map { it.id }
 
         return mapOf(
