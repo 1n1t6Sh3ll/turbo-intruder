@@ -5,6 +5,8 @@ enum class SortField {
     STATUS,
     LENGTH,
     TIME,
+    TTFB,
+    TTLB,
     WORDCOUNT,
     ANOMALY_RANK,
     ARRIVAL
@@ -45,7 +47,9 @@ class ResultStore : OutputHandler {
             SortField.ID -> compareBy { snapshot.indexOf(it) }
             SortField.STATUS -> compareBy { it.code }
             SortField.LENGTH -> compareBy { it.length }
-            SortField.TIME -> compareBy { it.time }
+            SortField.TIME -> compareBy { it.ttfb }
+            SortField.TTFB -> compareBy { it.ttfb }
+            SortField.TTLB -> compareBy { it.ttlb }
             SortField.WORDCOUNT -> compareBy { it.wordcount }
             SortField.ANOMALY_RANK -> compareBy { it.anomalyRank ?: 0 }
             SortField.ARRIVAL -> compareBy { it.arrival }

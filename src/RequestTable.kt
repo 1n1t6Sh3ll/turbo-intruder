@@ -231,7 +231,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
 
             val htmlTable = StringBuilder()
             htmlTable.append("<table>")
-            htmlTable.append("<tr><td>Payload</td><td>Status</td><td>Time</td><td>Arrival</td><td>Label</td><td>Queue ID</td><td>Connection ID</td></tr>")
+            htmlTable.append("<tr><td>Payload</td><td>Status</td><td>TTFB</td><td>TTLB</td><td>Arrival</td><td>Label</td><td>Queue ID</td><td>Connection ID</td></tr>")
 
             for (req in getSelectedRequests()) {
                 htmlTable.append("<tr><td>")
@@ -241,7 +241,9 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
                 htmlTable.append("</td><td>")
                 htmlTable.append(req.status)
                 htmlTable.append("</td><td>")
-                htmlTable.append(req.time)
+                htmlTable.append(req.ttfb)
+                htmlTable.append("</td><td>")
+                htmlTable.append(req.ttlb)
                 htmlTable.append("</td><td>")
                 htmlTable.append(req.arrival)
                 htmlTable.append("</td><td>")

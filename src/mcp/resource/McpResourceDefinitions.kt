@@ -67,8 +67,8 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
 
     resource("turbo://runs/{run_id}/summary") {
         name = "Run results summary"
-        description = "Get paginated list of results from a run. Example: turbo://runs/abc123/summary?limit=50"
-        queryString("sort_by", default = "id", description = "id|status|length|time|wordcount")
+        description = "Get paginated list of results from a run. Timing fields: ttfb = time to first byte (microseconds), ttlb = time to last byte (microseconds). Example: turbo://runs/abc123/summary?limit=50"
+        queryString("sort_by", default = "id", description = "id|status|length|ttfb|ttlb|wordcount|anomaly_rank")
         queryBool("descending", default = true)
         queryInt("limit", default = 100)
         queryInt("offset", default = 0)

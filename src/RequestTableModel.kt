@@ -37,9 +37,10 @@ class RequestTableModel: AbstractTableModel() {
                 5 -> java.lang.Integer::class.java
                 6 -> java.lang.Long::class.java
                 7 -> java.lang.Long::class.java
-                8 -> String::class.java
-                9 -> java.lang.Integer::class.java
+                8 -> java.lang.Long::class.java
+                9 -> String::class.java
                 10 -> java.lang.Integer::class.java
+                11 -> java.lang.Integer::class.java
 
                 else -> throw RuntimeException("Invalid column requested")
             }
@@ -61,11 +62,12 @@ class RequestTableModel: AbstractTableModel() {
                 3 -> request.anomalyRank ?: 0
                 4 -> request.wordcount
                 5 -> request.length
-                6 -> request.time
-                7 -> request.arrival
-                8 -> request.label
-                9 -> request.id
-                10 -> request.connectionID
+                6 -> request.ttfb
+                7 -> request.ttlb
+                8 -> request.arrival
+                9 -> request.label
+                10 -> request.id
+                11 -> request.connectionID
                 else -> throw RuntimeException("Invalid column requested")
             }
         } catch (e: Exception) {
@@ -90,7 +92,7 @@ class RequestTableModel: AbstractTableModel() {
     }
 
     companion object {
-        internal val columns = listOf("Row", "Payload", "Status", "Anomaly rank", "Words", "Length", "Time", "Arrival", "Label", "Queue ID", "Connection ID")
+        internal val columns = listOf("Row", "Payload", "Status", "Anomaly rank", "Words", "Length", "TTFB", "TTLB", "Arrival", "Label", "Queue ID", "Connection ID")
     }
 
     fun getAllRequests(): List<Request> {

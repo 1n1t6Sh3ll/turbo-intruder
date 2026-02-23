@@ -152,17 +152,45 @@ class ResultStoreTest {
     }
 
     @Test
-    fun `getResults sorts by time`() {
-        val slow = Request("GET / HTTP/1.1").apply { time = 1000L }
-        val fast = Request("GET / HTTP/1.1").apply { time = 100L }
+    fun `getResults sorts by time using ttfb`() {
+        val slow = Request("GET / HTTP/1.1").apply { ttfb = 1000L; time = 1000L }
+        val fast = Request("GET / HTTP/1.1").apply { ttfb = 100L; time = 100L }
 
         store.add(slow)
         store.add(fast)
 
         val results = store.getResults(sortBy = SortField.TIME, descending = false)
 
-        assertEquals(100L, results[0].time)
-        assertEquals(1000L, results[1].time)
+        assertEquals(100L, results[0].ttfb)
+        assertEquals(1000L, results[1].ttfb)
+    }
+
+    @Test
+    fun `getResults sorts by TTFB`() {
+        val slow = Request("GET / HTTP/1.1").apply { ttfb = 1000L }
+        val fast = Request("GET / HTTP/1.1").apply { ttfb = 100L }
+
+        store.add(slow)
+        store.add(fast)
+
+        val results = store.getResults(sortBy = SortField.TTFB, descending = false)
+
+        assertEquals(100L, results[0].ttfb)
+        assertEquals(1000L, results[1].ttfb)
+    }
+
+    @Test
+    fun `getResults sorts by TTLB`() {
+        val slow = Request("GET / HTTP/1.1").apply { ttlb = 2000L }
+        val fast = Request("GET / HTTP/1.1").apply { ttlb = 200L }
+
+        store.add(slow)
+        store.add(fast)
+
+        val results = store.getResults(sortBy = SortField.TTLB, descending = false)
+
+        assertEquals(200L, results[0].ttlb)
+        assertEquals(2000L, results[1].ttlb)
     }
 
     @Test
@@ -185,17 +213,17 @@ class ResultStoreTest {
     @Test
     fun `getResults pagination with offset and limit`() {
         repeat(10) { i ->
-            val req = Request("GET /$i HTTP/1.1").apply { time = i.toLong() }
+            val req = Request("GET /$i HTTP/1.1").apply { ttfb = i.toLong(); time = i.toLong() }
             store.add(req)
         }
 
-        // Get page 2 (items 3-5) sorted by time ascending
-        val results = store.getResults(sortBy = SortField.TIME, descending = false, offset = 3, limit = 3)
+        // Get page 2 (items 3-5) sorted by ttfb ascending
+        val results = store.getResults(sortBy = SortField.TTFB, descending = false, offset = 3, limit = 3)
 
         assertEquals(3, results.size)
-        assertEquals(3L, results[0].time)
-        assertEquals(4L, results[1].time)
-        assertEquals(5L, results[2].time)
+        assertEquals(3L, results[0].ttfb)
+        assertEquals(4L, results[1].ttfb)
+        assertEquals(5L, results[2].ttfb)
     }
 
     @Test

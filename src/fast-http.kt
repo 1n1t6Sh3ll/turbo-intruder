@@ -566,9 +566,9 @@ fun main(args : Array<String>) {
         evalJython(code, req, rawReq, endpoint, "", baseInput, store, runHandler, mutableListOf(), null)
 
         // Print results to console (replaces ConsolePrinter behavior)
-        println("ID | Word | Status | Wordcount | Length | Time")
+        println("ID | Word | Status | Wordcount | Length | TTFB | TTLB")
         store.getAllRquests().forEachIndexed { index, req ->
-            println("${index + 1} | ${req.words.joinToString("/")} | ${req.code} | ${req.wordcount} | ${req.length} | ${req.time}")
+            println("${index + 1} | ${req.words.joinToString("/")} | ${req.code} | ${req.wordcount} | ${req.length} | ${req.ttfb} | ${req.ttlb}")
         }
     }
 

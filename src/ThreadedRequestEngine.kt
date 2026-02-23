@@ -220,6 +220,7 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
                     var readCount = 0
                     startTime = 0
                     var endTime: Long = 0
+                    var bodyEndTime: Long = 0
                     var buffer = ""
 
                     for (j in 1..readFreq) {
@@ -463,6 +464,8 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
                             }
                         }
 
+                        bodyEndTime = System.nanoTime()
+
                         if (shouldAbandonRun()) {
                             break
                         }
@@ -482,7 +485,9 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
                         successfulRequests.getAndIncrement()
                         reqWithResponse.response = msg
                         reqWithResponse.connectionID = connectionID
-                        reqWithResponse.time = (endTime - startTime) / 1000 // convert ns to microseconds
+                        reqWithResponse.ttfb = (endTime - startTime) / 1000 // convert ns to microseconds
+                        reqWithResponse.ttlb = (bodyEndTime - startTime) / 1000
+                        reqWithResponse.time = reqWithResponse.ttfb
                         reqWithResponse.arrival = (endTime - start) / 1000
 
                         answeredRequests += 1
@@ -523,7 +528,10 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
                                 badReq.response = "null"
                             }
                             if (startTime != 0L) {
-                                badReq.time = (System.nanoTime() - startTime) / 1000000 // convert to NS and lose precision
+                                val elapsed = (System.nanoTime() - startTime) / 1000
+                                badReq.ttfb = elapsed
+                                badReq.ttlb = elapsed
+                                badReq.time = elapsed
                             }
                             invokeCallback(badReq, true)
                         }

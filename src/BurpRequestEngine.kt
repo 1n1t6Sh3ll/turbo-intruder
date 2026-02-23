@@ -61,28 +61,27 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
         return Request(prepared, payloads, learnBoring ?: 0, label)
     }
 
-    private fun request(service: IHttpService, req: Request): Pair<IHttpRequestResponse?, Long> {
-        val resp: IHttpRequestResponse?
-        val startTime = System.nanoTime()
-        var responseTime = 0L
+    private fun request(service: IHttpService, req: Request) {
         if (useHTTP1) {
-            try {
-
-                resp = Utils.callbacks.makeHttpRequest(service, req.getRequestAsBytes(), true)
-                responseTime = System.nanoTime() - startTime
-            } catch (e: NoSuchMethodError) {
-                throw RuntimeException("Please update Burp Suite")
+            val montoyaService = HttpService.httpService(service.host, service.port, "https".equals(service.protocol))
+            val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest()))
+            req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
+            req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
+            req.time = req.ttfb
+            if (montoyaResp.response() != null) {
+                req.response = montoyaResp.response().toString()
             }
         } else {
+            val startTime = System.nanoTime()
             val respBytes = Utils.h2request(service, req.getRequestAsBytes())
-            responseTime = System.nanoTime() - startTime
+            val responseTime = (System.nanoTime() - startTime) / 1000
+            req.ttfb = responseTime
+            req.ttlb = responseTime
+            req.time = responseTime
             if (respBytes != null) {
                 req.response = Utils.helpers.bytesToString(respBytes)
             }
-            resp = BurpRequest(req)
         }
-
-        return Pair(resp, responseTime/1000) // convert to microseconds
     }
 
 
@@ -151,8 +150,10 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                             req.response = resp.response().toString()
                         }
 
-                        req.time = resp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
-                        req.arrival = (timer - start) / 1000 + req.time
+                        req.ttfb = resp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
+                        req.ttlb = resp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
+                        req.time = req.ttfb
+                        req.arrival = (timer - start) / 1000 + req.ttfb
 
                         if (useHTTP1) {
                             req.connectionID = connections.incrementAndGet()
@@ -163,7 +164,7 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                         reqs.add(req)
                     }
 
-                    reqs.sortBy { it.time }
+                    reqs.sortBy { it.ttfb }
 
                     var i = 0
                     for (req in reqs) {
@@ -215,26 +216,32 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                     val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest().replace("HTTP/2\r\n","HTTP/1.1\r\n")))
                     req.response = montoyaResp.response().toString()
                     req.montoyaReq = montoyaResp
+                    req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
+                    req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
+                    req.time = req.ttfb
                     req.interesting = processResponse(req, montoyaResp.response().toByteArray().bytes)
                     successfulRequests.getAndIncrement()
                     invokeCallback(req, req.interesting)
                     continue
                 }
 
-                var resp: IHttpRequestResponse?
-                var time: Long
-                val pair = request(service, req)
-                resp = pair.first
-                time = pair.second
+                request(service, req)
                 connections.incrementAndGet()
-                while (resp!!.response == null && shouldRetry(req)) {
+                while (req.response == null && shouldRetry(req)) {
                     Utils.out("Retrying ${req.words}")
-                    resp = request(service, req).first
+                    request(service, req)
                     connections.incrementAndGet()
                     Utils.out("Retried ${req.words}")
                 }
-                req.time = time
-                passToCallback(req, resp)
+
+                if (req.response == null) {
+                    req.response = "The server closed the connection without issuing a response."
+                    invokeCallback(req, true)
+                } else {
+                    successfulRequests.getAndIncrement()
+                    val interesting = processResponse(req, req.getResponseAsBytes()!!)
+                    invokeCallback(req, interesting)
+                }
 
             } catch (ex: Exception) {
                 ex.printStackTrace()
@@ -246,20 +253,6 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
             }
         } finally {
             completedLatch.countDown()
-        }
-    }
-
-    private fun passToCallback(req: Request, resp: IHttpRequestResponse?) {
-        if(resp == null || resp.response == null) {
-            req.response = "The server closed the connection without issuing a response."
-            invokeCallback(req, true)
-        }
-
-        if (resp!!.response != null) {
-            successfulRequests.getAndIncrement()
-            val interesting = processResponse(req, resp.response)
-            req.response = Utils.helpers.bytesToString(resp.response) // , StandardCharsets.UTF_8
-            invokeCallback(req, interesting)
         }
     }
 

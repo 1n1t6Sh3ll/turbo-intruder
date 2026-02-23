@@ -9,7 +9,8 @@ fun Request.toSummaryMap(): Map<String, Any?> = mapOf(
     "id" to id,
     "status" to code,
     "length" to length,
-    "time" to time,
+    "ttfb" to ttfb,
+    "ttlb" to ttlb,
     "wordcount" to wordcount,
     "words" to words,
     "label" to label,
@@ -128,7 +129,8 @@ class McpResourceHandlers(
                 "response_file" to responseFile.absolutePath,
                 "status" to request.code,
                 "length" to request.length,
-                "time" to request.time,
+                "ttfb" to request.ttfb,
+                "ttlb" to request.ttlb,
                 "words" to request.words
             )
         }
@@ -142,7 +144,8 @@ class McpResourceHandlers(
             "response_headers" to filterHeaders(headers),
             "status" to request.code,
             "length" to request.length,
-            "time" to request.time,
+            "ttfb" to request.ttfb,
+            "ttlb" to request.ttlb,
             "words" to request.words
         ) + truncatedBody.toResponseFields()
     }

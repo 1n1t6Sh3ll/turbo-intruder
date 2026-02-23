@@ -285,6 +285,25 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `getResults includes ttfb and ttlb instead of time`() {
+        val run = manager.startRun()
+        val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        request.id = 1
+        request.response = "HTTP/1.1 200 OK\r\n\r\nok"
+        request.ttfb = 500L
+        request.ttlb = 1000L
+        run.store.add(request)
+
+        val result = handlers.getResults(run.id, "id", true, 100, 0)
+
+        @Suppress("UNCHECKED_CAST")
+        val results = result["results"] as List<Map<String, Any?>>
+        assertEquals(500L, results[0]["ttfb"])
+        assertEquals(1000L, results[0]["ttlb"])
+        assertFalse(results[0].containsKey("time"))
+    }
+
+    @Test
     fun `getRequestDetail returns result by id for current run`() {
         val run = manager.startRun()
         val request = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
