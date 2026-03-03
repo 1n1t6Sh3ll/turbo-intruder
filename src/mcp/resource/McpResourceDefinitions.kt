@@ -50,9 +50,11 @@ fun createResourceDefinitions(handlers: McpResourceHandlers): List<ResourceDefin
 
     resource("turbo://runs/{run_id}") {
         name = "Status of a specific run"
-        description = "Get detailed status of a specific run including running state, result count, and status message"
+        description = "Get detailed status of a specific run including running state, result count, fails (requests that got no response), and status message. Use ?wait=true to long-poll until the run completes (up to 50s)"
+        queryBool("wait", default = false, description = "long-poll until run completes (up to 50s)")
         handle { params ->
-            handlers.getRunStatus(params.path("run_id"))
+            val waitMs = if (params.bool("wait") == true) 50_000L else 0L
+            handlers.getRunStatus(params.path("run_id"), waitMs)
         }
     },
 

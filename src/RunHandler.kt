@@ -14,8 +14,19 @@ class RunHandler (){
 
     fun hasError(): Boolean = errorFlag
 
-    fun isRunning(): Boolean {
-        return running
+    fun failCount(): Int = engine?.permaFails?.get() ?: 0
+
+    fun status(): String {
+        if (errorFlag) return "failed"
+        val eng = engine
+        if (eng != null) {
+            return when {
+                eng.runState.get() >= 4 -> "completed"
+                eng.runState.get() >= 3 -> "exited-early"
+                else -> "running"
+            }
+        }
+        return if (scriptCompleted) "completed" else "running"
     }
 
     fun setComplete() {
@@ -24,15 +35,6 @@ class RunHandler (){
 
     fun markScriptCompleted() {
         scriptCompleted = true
-    }
-
-    fun hasFinished(): Boolean {
-        // If engine exists, check its state
-        if (engine != null) {
-            return engine!!.runState.get() >= 3
-        }
-        // If no engine was created, check if script has completed
-        return scriptCompleted
     }
 
     fun setRequestEngine(engine: RequestEngine) {

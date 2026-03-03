@@ -256,7 +256,7 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "run_id": { "type": "string", "description": "ID of the run to stop." }
+                    "run_id": { "type": "string" }
                 },
                 "required": ["run_id"]
             }
@@ -278,7 +278,7 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "run_id": { "type": "string", "description": "ID of the run to delete." }
+                    "run_id": { "type": "string" }
                 },
                 "required": ["run_id"]
             }
@@ -300,8 +300,8 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "id": { "type": "integer", "description": "The Organizer item ID" },
-                    "notes": { "type": "string", "description": "The new notes content" }
+                    "id": { "type": "integer" },
+                    "notes": { "type": "string" }
                 },
                 "required": ["id", "notes"]
             }
@@ -327,7 +327,7 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "run_id": { "type": "string", "description": "ID of the run to save requests from." },
+                    "run_id": { "type": "string" },
                     "items": { "type": "string", "description": "JSON array of objects with request_id (int) and notes (string)" }
                 },
                 "required": ["run_id", "items"]
@@ -403,9 +403,9 @@ class TurboMcpServer(
             {
                 "type": "object",
                 "properties": {
-                    "query": { "type": "string", "description": "The string to search for in response bodies" },
-                    "run_id": { "type": "string", "description": "ID of the run to search." },
-                    "search_in": { "type": "string", "enum": ["all", "labels", "responses"], "description": "Where to search: 'all' (default) searches both labels and response bodies, 'labels' searches only labels, 'responses' searches only response bodies" }
+                    "query": { "type": "string" },
+                    "run_id": { "type": "string" },
+                    "search_in": { "type": "string", "enum": ["all", "labels", "responses"], "description": "Default: all" }
                 },
                 "required": ["query", "run_id"]
             }

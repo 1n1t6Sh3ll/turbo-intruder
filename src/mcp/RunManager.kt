@@ -37,7 +37,7 @@ class RunManager(private val maxCompletedRuns: Int = 100) {
 
     private fun evictCompletedRuns() {
         val completed = runs.values
-            .filter { it.handler.hasFinished() }
+            .filter { it.handler.status() != "running" }
             .sortedBy { it.sequenceNumber }
 
         val excess = completed.size - maxCompletedRuns

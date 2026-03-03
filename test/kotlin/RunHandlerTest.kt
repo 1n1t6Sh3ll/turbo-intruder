@@ -14,8 +14,8 @@ class RunHandlerTest {
     }
 
     @Test
-    fun `isRunning returns false initially`() {
-        assertFalse(handler.isRunning())
+    fun `status returns running initially`() {
+        assertEquals("running", handler.status())
     }
 
     @Test
@@ -24,58 +24,62 @@ class RunHandlerTest {
     }
 
     @Test
-    fun `hasFinished returns false when no engine`() {
-        assertFalse(handler.hasFinished())
-    }
-
-    @Test
-    fun `setRequestEngine sets running to true`() {
-        val engine = TestRequestEngine()
-
-        handler.setRequestEngine(engine)
-
-        assertTrue(handler.isRunning())
-    }
-
-    @Test
-    fun `hasFinished returns false when engine state below 3`() {
+    fun `status returns running when engine state below 3`() {
         val engine = TestRequestEngine()
         engine.setRunState(1) // live
 
         handler.setRequestEngine(engine)
 
-        assertFalse(handler.hasFinished())
+        assertEquals("running", handler.status())
     }
 
     @Test
-    fun `hasFinished returns true when engine state is 3 (cancelled)`() {
+    fun `status returns exited-early when engine state is 3 (cancelled)`() {
         val engine = TestRequestEngine()
         engine.setRunState(3) // cancelled
 
         handler.setRequestEngine(engine)
 
-        assertTrue(handler.hasFinished())
+        assertEquals("exited-early", handler.status())
     }
 
     @Test
-    fun `hasFinished returns true when engine state is 4 (completed)`() {
+    fun `status returns completed when engine state is 4`() {
         val engine = TestRequestEngine()
         engine.setRunState(4) // completed
 
         handler.setRequestEngine(engine)
 
-        assertTrue(handler.hasFinished())
+        assertEquals("completed", handler.status())
     }
 
     @Test
-    fun `abort sets running to false`() {
+    fun `status returns completed when script completes without engine`() {
+        handler.markScriptCompleted()
+
+        assertEquals("completed", handler.status())
+    }
+
+    @Test
+    fun `status returns failed when hasError is true regardless of engine state`() {
         val engine = TestRequestEngine()
+        engine.setRunState(4) // completed
         handler.setRequestEngine(engine)
-        assertTrue(handler.isRunning())
 
-        handler.abort()
+        handler.overrideStatus("Something went wrong")
 
-        assertFalse(handler.isRunning())
+        assertEquals("failed", handler.status())
+    }
+
+    @Test
+    fun `status returns failed when hasError is true and engine cancelled`() {
+        val engine = TestRequestEngine()
+        engine.setRunState(3) // cancelled
+        handler.setRequestEngine(engine)
+
+        handler.overrideStatus("Validation failed")
+
+        assertEquals("failed", handler.status())
     }
 
     @Test

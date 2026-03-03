@@ -17,7 +17,7 @@ class UpdateStatusbar(val message: JLabel, val handler: RunHandler): ActionListe
     lateinit var timer: Timer
 
     override fun actionPerformed(e: ActionEvent?) {
-        if (handler.hasFinished() || SwingUtilities.getWindowAncestor(message) == null){
+        if (handler.status() != "running" || SwingUtilities.getWindowAncestor(message) == null){
             timer.stop()
             val parent = (SwingUtilities.getWindowAncestor(message) as JFrame?)
             parent?.title = parent?.title?.replace(" - running", " - done")
@@ -175,7 +175,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
         var finishedAt: Long? = null
         val storePoller = javax.swing.Timer(100) {
             // Stop polling 10 seconds after run completes
-            if (handler.hasFinished()) {
+            if (handler.status() != "running") {
                 if (finishedAt == null) {
                     finishedAt = System.currentTimeMillis()
                 } else if (System.currentTimeMillis() - finishedAt!! > 10000) {

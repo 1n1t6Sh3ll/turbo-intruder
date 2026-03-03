@@ -50,21 +50,29 @@ class McpResourceHandlers(
         return mapOf("error" to error)
     }
 
-    fun getRunStatus(runId: String): Map<String, Any?> {
+    fun getRunStatus(runId: String, waitMs: Long = 0): Map<String, Any?> {
         val run = manager.getRun(runId)
             ?: return runNotFoundError(runId)
 
+        if (waitMs > 0 && run.handler.status() == "running") {
+            val deadline = System.currentTimeMillis() + waitMs
+            while (run.handler.status() == "running" && System.currentTimeMillis() < deadline) {
+                Thread.sleep(100)
+            }
+        }
+
+        val status = run.handler.status()
         val baseStatus = mapOf(
             "run_id" to run.id,
-            "running" to run.handler.isRunning(),
-            "finished" to run.handler.hasFinished(),
+            "status" to status,
             "status_message" to run.handler.statusString(),
             "result_count" to run.store.count(),
+            "fails" to run.handler.failCount(),
             "created_at" to run.createdAt
         )
 
-        // Include summary when run is finished
-        if (run.handler.hasFinished()) {
+        // Include summary when run is not running
+        if (status != "running") {
             val results = run.store.getResults(SortField.ANOMALY_RANK, true, 20, 0)
             val summary = results.map { it.toSummaryMap() }
             return baseStatus + mapOf("summary" to summary)

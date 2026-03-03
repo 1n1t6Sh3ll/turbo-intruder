@@ -159,13 +159,13 @@ def handleResponse(req, interesting):
         var attempts = 0
         while (attempts < 30) {
             val status = server.resourceHandlers.getRunStatus(runId)
-            if (status["finished"] == true && status["result_count"] as Int > 0) break
+            if (status["status"] != "running" && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
         val status = server.resourceHandlers.getRunStatus(runId)
-        assertEquals(true, status["finished"], "Run should have finished")
+        assertNotEquals("running", status["status"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId(runId)
@@ -212,13 +212,13 @@ def handleResponse(req, interesting):
         var attempts = 0
         while (attempts < 30) {
             val status = server.resourceHandlers.getRunStatus(runId)
-            if (status["finished"] == true && status["result_count"] as Int > 0) break
+            if (status["status"] != "running" && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
         val status = server.resourceHandlers.getRunStatus(runId)
-        assertEquals(true, status["finished"], "Run should have finished")
+        assertNotEquals("running", status["status"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId(runId)
@@ -269,13 +269,13 @@ def handleResponse(req, interesting):
         var attempts = 0
         while (attempts < 30) {
             val status = server.resourceHandlers.getRunStatus(runId)
-            if (status["finished"] == true && status["result_count"] as Int > 0) break
+            if (status["status"] != "running" && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
         val status = server.resourceHandlers.getRunStatus(runId)
-        assertEquals(true, status["finished"], "Run should have finished")
+        assertNotEquals("running", status["status"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId(runId)
@@ -322,13 +322,13 @@ def handleResponse(req, interesting):
         var attempts = 0
         while (attempts < 30) {
             val status = server.resourceHandlers.getRunStatus(runId)
-            if (status["finished"] == true && status["result_count"] as Int > 0) break
+            if (status["status"] != "running" && status["result_count"] as Int > 0) break
             Thread.sleep(500)
             attempts++
         }
 
         val status = server.resourceHandlers.getRunStatus(runId)
-        assertEquals(true, status["finished"], "Run should have finished")
+        assertNotEquals("running", status["status"], "Run should have finished")
         assertTrue((status["result_count"] as Int) > 0, "Should have at least one result")
 
         val requestId = getFirstResultId(runId)

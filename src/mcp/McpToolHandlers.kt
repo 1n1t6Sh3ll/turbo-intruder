@@ -92,16 +92,15 @@ class McpToolHandlers(
 
         // Wait for completion or timeout
         val startTime = System.currentTimeMillis()
-        while (!run.handler.hasFinished()) {
+        while (run.handler.status() == "running") {
             if (System.currentTimeMillis() - startTime > timeoutMs) {
                 val result = mutableMapOf<String, Any?>(
-                    "status" to "in_progress",
-                    "message" to "The run is still executing. Read the turbo://runs/${run.id} resource to check status and retrieve results.",
+                    "status" to "running",
+                    "message" to "The run is still executing. Read turbo://runs/${run.id}?wait=true to long-poll until completion.",
                     "run_id" to run.id,
-                    "running" to run.handler.isRunning(),
-                    "finished" to run.handler.hasFinished(),
                     "status_message" to run.handler.statusString(),
                     "result_count" to run.store.count(),
+                    "fails" to run.handler.failCount(),
                     "created_at" to run.createdAt
                 )
                 normalized.warning?.let { result["warning"] = it }
@@ -111,15 +110,16 @@ class McpToolHandlers(
         }
 
         // Get results sorted by anomaly rank descending
-        val failed = run.handler.hasError()
+        val status = run.handler.status()
         val results = run.store.getResults(burp.SortField.ANOMALY_RANK, true, 100, 0)
         val result = mutableMapOf<String, Any?>(
-            "status" to if (failed) "failed" else "completed",
+            "status" to status,
             "run_id" to run.id,
             "result_count" to run.store.count(),
+            "fails" to run.handler.failCount(),
             "results" to results.map { it.toSummaryMap() }
         )
-        if (failed) {
+        if (status == "failed") {
             result["error_message"] = run.handler.statusString()
         }
         normalized.warning?.let { result["warning"] = it }

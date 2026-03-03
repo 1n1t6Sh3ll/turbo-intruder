@@ -41,6 +41,16 @@ class McpResourceDefinitionsTest {
     }
 
     @Test
+    fun `run status definition has wait query param`() {
+        val definitions = createResourceDefinitions(handlers)
+        val def = definitions.find { it.uriPattern == "turbo://runs/{run_id}" }!!
+
+        val waitParam = def.queryParams.find { it.name == "wait" }
+        assertNotNull(waitParam, "Should have a 'wait' query param")
+        assertEquals(false, waitParam!!.default)
+    }
+
+    @Test
     fun `run summary definition has query params with defaults`() {
         val definitions = createResourceDefinitions(handlers)
         val def = definitions.find { it.uriPattern == "turbo://runs/{run_id}/summary" }!!

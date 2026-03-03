@@ -51,10 +51,11 @@ class McpToolHandlersTest {
         assertNotNull(result["run_id"])
         assertNotNull(result["results"])
         assertNotNull(result["result_count"])
+        assertEquals(0, result["fails"])
     }
 
     @Test
-    fun `startRun returns in_progress status with run details when wait exceeded`() {
+    fun `startRun returns running status with run details when wait exceeded`() {
         val result = handlers.startRun(
             script = """
 def queueRequests(target, wordlists):
@@ -70,15 +71,19 @@ def completed(results):
             timeoutMs = 100  // Very short timeout
         )
 
-        assertEquals("in_progress", result["status"])
+        assertEquals("running", result["status"])
         assertNotNull(result["run_id"])
         assertNotNull(result["message"])
         assertTrue((result["message"] as String).contains("turbo://runs/"))
-        assertTrue(result.containsKey("running"))
-        assertEquals(false, result["finished"])
+        assertFalse(result.containsKey("running"), "Should not contain 'running' boolean")
+        assertFalse(result.containsKey("finished"), "Should not contain 'finished' boolean")
         assertNotNull(result["status_message"])
         assertNotNull(result["result_count"])
+        assertNotNull(result["fails"])
         assertNotNull(result["created_at"])
+
+        // Stop the run so the background sleep(10) thread doesn't delay test suite exit
+        handlers.stopRun(result["run_id"] as String)
     }
 
     @Test

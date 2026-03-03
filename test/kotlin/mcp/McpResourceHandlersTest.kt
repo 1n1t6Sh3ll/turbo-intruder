@@ -40,15 +40,17 @@ class McpResourceHandlersTest {
     }
 
     @Test
-    fun `getRunStatus returns run info`() {
+    fun `getRunStatus returns run info with status field`() {
         val run = manager.startRun()
 
         val result = handlers.getRunStatus(run.id)
 
         assertNotNull(result["run_id"])
-        assertNotNull(result["running"])
-        assertNotNull(result["finished"])
+        assertEquals("running", result["status"])
+        assertFalse(result.containsKey("running"), "Should not contain 'running' boolean")
+        assertFalse(result.containsKey("finished"), "Should not contain 'finished' boolean")
         assertNotNull(result["result_count"])
+        assertEquals(0, result["fails"])
     }
 
     @Test
@@ -69,13 +71,13 @@ class McpResourceHandlersTest {
         run.store.add(req1)
         run.store.add(req2)
 
-        // Mark run as finished (no engine created, so markScriptCompleted will trigger hasFinished=true)
+        // Mark run as finished (no engine created, so markScriptCompleted will trigger status=completed)
         run.handler.markScriptCompleted()
 
         val result = handlers.getRunStatus(run.id)
 
-        assertEquals(true, result["finished"])
-        // Should include summary when finished
+        assertEquals("completed", result["status"])
+        // Should include summary when not running
         @Suppress("UNCHECKED_CAST")
         val summary = result["summary"] as? List<Map<String, Any?>>
         assertNotNull(summary, "Status should include summary when run is finished")
@@ -97,7 +99,7 @@ class McpResourceHandlersTest {
 
         val result = handlers.getRunStatus(run.id)
 
-        assertEquals(false, result["finished"])
+        assertEquals("running", result["status"])
         assertNull(result["summary"], "Status should NOT include summary when run is still running")
     }
 
@@ -977,6 +979,74 @@ class McpResourceHandlersTest {
         assertEquals(1, result["page"])
         assertEquals(10, result["page_size"])
         assertEquals(2, result["total_pages"])
+    }
+
+    // Long-poll tests
+
+    @Test
+    fun `getRunStatus with waitMs returns immediately when run is finished`() {
+        val run = manager.startRun()
+        run.handler.markScriptCompleted()
+
+        val start = System.currentTimeMillis()
+        val result = handlers.getRunStatus(run.id, waitMs = 5000)
+        val elapsed = System.currentTimeMillis() - start
+
+        assertEquals("completed", result["status"])
+        assertTrue(elapsed < 1000, "Should return immediately for finished run, took ${elapsed}ms")
+    }
+
+    @Test
+    fun `getRunStatus with waitMs blocks until run finishes`() {
+        val run = manager.startRun()
+
+        Thread {
+            Thread.sleep(200)
+            run.handler.markScriptCompleted()
+        }.start()
+
+        val start = System.currentTimeMillis()
+        val result = handlers.getRunStatus(run.id, waitMs = 5000)
+        val elapsed = System.currentTimeMillis() - start
+
+        assertEquals("completed", result["status"])
+        assertNotNull(result["summary"], "Should include summary when run finishes during wait")
+        assertTrue(elapsed in 100..2000, "Should return shortly after run finishes, took ${elapsed}ms")
+    }
+
+    @Test
+    fun `getRunStatus with waitMs times out if run does not finish`() {
+        val run = manager.startRun()
+
+        val start = System.currentTimeMillis()
+        val result = handlers.getRunStatus(run.id, waitMs = 300)
+        val elapsed = System.currentTimeMillis() - start
+
+        assertEquals("running", result["status"])
+        assertNull(result["summary"], "Should not include summary when still running")
+        assertTrue(elapsed in 200..1000, "Should return after timeout, took ${elapsed}ms")
+    }
+
+    @Test
+    fun `getRunStatus without waitMs returns immediately for in-progress run`() {
+        val run = manager.startRun()
+
+        val start = System.currentTimeMillis()
+        val result = handlers.getRunStatus(run.id)
+        val elapsed = System.currentTimeMillis() - start
+
+        assertEquals("running", result["status"])
+        assertTrue(elapsed < 500, "Should return immediately without wait, took ${elapsed}ms")
+    }
+
+    @Test
+    fun `getRunStatus with waitMs returns not_found immediately for missing run`() {
+        val start = System.currentTimeMillis()
+        val result = handlers.getRunStatus("nonexistent", waitMs = 5000)
+        val elapsed = System.currentTimeMillis() - start
+
+        assertEquals("not_found", result["error"])
+        assertTrue(elapsed < 500, "Should return immediately for missing run, took ${elapsed}ms")
     }
 
     // Example script resource tests
