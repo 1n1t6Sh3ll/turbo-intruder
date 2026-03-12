@@ -1,5 +1,6 @@
 package mcp
 
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper
 import io.modelcontextprotocol.server.McpServer
@@ -71,7 +72,9 @@ class TurboMcpServer(
 
     private var statelessServer: io.modelcontextprotocol.server.McpStatelessSyncServer? = null
     private var jettyServer: Server? = null
-    private val jsonMapper = JacksonMcpJsonMapper(ObjectMapper())
+    private val jsonMapper = JacksonMcpJsonMapper(ObjectMapper().apply {
+        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    })
 
     /**
      * Wraps a tool handler action with error handling that includes stack traces.
@@ -141,6 +144,7 @@ class TurboMcpServer(
         jettyServer = jetty
 
         statelessServer = McpServer.sync(transport)
+            .jsonMapper(jsonMapper)
             .serverInfo("turbo-simulator", "1.0.0")
             .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
             .capabilities(McpSchema.ServerCapabilities.builder()
@@ -166,7 +170,6 @@ class TurboMcpServer(
             if (ENABLE_ASYNC_RUN) buildStatelessStartRunAsyncTool() else null,
             buildStatelessStopRunTool(),
             buildStatelessDeleteRunTool(),
-            buildStatelessSetOrganizerNotesTool(),
             buildStatelessSaveToOrganizerTool(),
             buildStatelessGenerateCollaboratorPayloadTool(),
             buildStatelessGetCollaboratorInteractionsTool(),
@@ -288,33 +291,6 @@ class TurboMcpServer(
         return McpStatelessServerFeatures.SyncToolSpecification(tool) { _, request ->
             executeToolWithErrorHandling {
                 toolHandlers.deleteRun(request.arguments()["run_id"] as String)
-            }
-        }
-    }
-
-    private fun buildStatelessSetOrganizerNotesTool(): McpStatelessServerFeatures.SyncToolSpecification {
-        val tool = McpSchema.Tool.builder()
-            .name("set_organizer_notes")
-            .description("Update the notes on an Organizer item.")
-            .inputSchema(jsonMapper, """
-            {
-                "type": "object",
-                "properties": {
-                    "id": { "type": "integer" },
-                    "notes": { "type": "string" }
-                },
-                "required": ["id", "notes"]
-            }
-            """.trimIndent())
-            .build()
-
-        return McpStatelessServerFeatures.SyncToolSpecification(tool) { _, request ->
-            executeToolWithErrorHandling {
-                val args = request.arguments()
-                toolHandlers.setOrganizerNotes(
-                    id = (args["id"] as? Number)?.toInt() ?: 0,
-                    notes = args["notes"] as? String ?: ""
-                )
             }
         }
     }
