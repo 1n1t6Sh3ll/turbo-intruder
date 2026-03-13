@@ -21,7 +21,7 @@ open class Request(val template: String, val words: List<String?>, val learnBori
     var response: String? = null
     var details: IResponseVariations? = null
     var interesting: Boolean = false
-    var _engine: RequestEngine? = null
+    var targetUrl: URL? = null
     var engine: Any? = null
     var connectionID: Int = -1
     var callback: ((Request, Boolean) -> Boolean)? = null
@@ -54,7 +54,7 @@ open class Request(val template: String, val words: List<String?>, val learnBori
             callback!!.invoke(this, isinteresting)
         }
         else {
-            _engine!!.callback(this, isinteresting)
+            throw IllegalStateException("Request has no callback set")
         }
     }
 
@@ -67,6 +67,22 @@ open class Request(val template: String, val words: List<String?>, val learnBori
                 else -> "Unknown attribute"
             }
         }
+    }
+
+    fun materializeAttributes() {
+        getAttribute("code")
+        getAttribute("length")
+        getAttribute("wordcount")
+    }
+
+    fun stripResponseBody() {
+        materializeAttributes()
+        response = null
+        details = null
+        montoyaReq = null
+        engine = null
+        callback = null
+        gate = null
     }
 
     fun calculateCode(): Int {
@@ -224,7 +240,7 @@ class BurpRequest(val req: Request): IHttpRequestResponse {
     }
 
     override fun getHttpService(): IHttpService {
-        val url = req._engine!!.target
+        val url = req.targetUrl!!
         return Utils.callbacks.helpers.buildHttpService(url.host, getEffectivePort(url), url.protocol)
     }
 
