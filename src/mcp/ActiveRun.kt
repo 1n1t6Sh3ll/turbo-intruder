@@ -9,4 +9,6 @@ class ActiveRun(val sequenceNumber: Long = 0) {
     val handler: RunHandler = RunHandler()
     val store: ResultStore = ResultStore()
     val createdAt: Long = System.currentTimeMillis()
+    @Volatile
+    var responsesStripped: Boolean = false
 }

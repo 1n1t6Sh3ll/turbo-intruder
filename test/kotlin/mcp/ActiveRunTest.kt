@@ -34,4 +34,10 @@ class ActiveRunTest {
         assertTrue(run.createdAt >= before)
         assertTrue(run.createdAt <= after)
     }
+
+    @Test
+    fun `responsesStripped defaults to false`() {
+        val run = ActiveRun()
+        assertFalse(run.responsesStripped)
+    }
 }
