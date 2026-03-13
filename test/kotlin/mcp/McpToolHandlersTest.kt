@@ -153,9 +153,11 @@ def completed(results):
         assertEquals(listOf(1, 2), saved)
         assertEquals(2, fakeOrganizer.sentItems.size)
         assertTrue(fakeOrganizer.sentItems[0].second.startsWith("Interesting finding"))
+        assertTrue(fakeOrganizer.sentItems[0].second.contains("Run ID: ${run.id}"))
         assertTrue(fakeOrganizer.sentItems[0].second.contains("--- Script ---"))
         assertTrue(fakeOrganizer.sentItems[0].second.contains("def queueRequests"))
         assertTrue(fakeOrganizer.sentItems[1].second.startsWith("Check this"))
+        assertTrue(fakeOrganizer.sentItems[1].second.contains("Run ID: ${run.id}"))
         assertTrue(fakeOrganizer.sentItems[1].second.contains("--- Script ---"))
     }
 
@@ -359,6 +361,62 @@ def completed(results):
         val result = handlers.searchResponses(runId = "nonexistent", query = "test")
 
         assertEquals("No run found", result["error"])
+    }
+
+    @Test
+    fun `searchResponses notes when responses are stripped for response search`() {
+        val run = manager.startRun()
+        val req1 = burp.Request("GET /a HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.label = "interesting"
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nHello"
+        run.store.add(req1)
+
+        run.store.stripResponseBodies()
+        run.responsesStripped = true
+
+        val result = handlers.searchResponses(runId = run.id, query = "Hello", searchIn = "responses")
+
+        assertTrue(result.containsKey("warning"))
+        assertTrue((result["warning"] as String).contains("stripped"))
+    }
+
+    @Test
+    fun `searchResponses still searches labels on stripped runs`() {
+        val run = manager.startRun()
+        val req1 = burp.Request("GET /a HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.label = "interesting"
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nHello"
+        run.store.add(req1)
+
+        run.store.stripResponseBodies()
+        run.responsesStripped = true
+
+        val result = handlers.searchResponses(runId = run.id, query = "interesting", searchIn = "labels")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(listOf(1), matches)
+        assertFalse(result.containsKey("warning"))
+    }
+
+    @Test
+    fun `searchResponses with default searchIn warns and still matches labels on stripped run`() {
+        val run = manager.startRun()
+        val req1 = burp.Request("GET /a HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req1.id = 1
+        req1.label = "interesting"
+        req1.response = "HTTP/1.1 200 OK\r\n\r\nHello"
+        run.store.add(req1)
+
+        run.store.stripResponseBodies()
+        run.responsesStripped = true
+
+        val result = handlers.searchResponses(runId = run.id, query = "interesting")
+
+        val matches = result["matches"] as List<Int>
+        assertEquals(listOf(1), matches)
+        assertTrue(result.containsKey("warning"))
     }
 
     @Test

@@ -59,6 +59,8 @@ class McpToolHandlers(
         val saved = mutableListOf<Int>()
         val errors = mutableListOf<Map<String, Any>>()
 
+        val runIdSection = "\n\nRun ID: ${run.id}"
+
         val scriptSection = if (run.handler.code.isNotBlank()) {
             "\n\n--- Script ---\n${run.handler.code}"
         } else ""
@@ -71,7 +73,7 @@ class McpToolHandlers(
                 errors.add(mapOf("request_id" to requestId, "error" to "Request not found"))
                 continue
             }
-            organizerProvider.sendToOrganizer(request, notes + scriptSection)
+            organizerProvider.sendToOrganizer(request, notes + runIdSection + scriptSection)
             saved.add(requestId)
         }
 
@@ -163,10 +165,16 @@ class McpToolHandlers(
             }
             .map { it.id }
 
-        return mapOf(
+        val result = mutableMapOf<String, Any>(
             "matches" to matches,
             "match_count" to matches.size
         )
+
+        if (run.responsesStripped && searchIn != "labels") {
+            result["warning"] = "Response bodies have been stripped from this run to free memory. Only label search is available."
+        }
+
+        return result
     }
 
     private fun launchRun(
