@@ -3,7 +3,10 @@ package mcp
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-class RunManager(private val maxCompletedRuns: Int = 100) {
+class RunManager(
+    private val maxCompletedRuns: Int = 100,
+    private val maxFullResponseRuns: Int = 50
+) {
     private val runs = ConcurrentHashMap<String, ActiveRun>()
     private val evictedIds = ConcurrentHashMap.newKeySet<String>()
     private val sequenceCounter = AtomicLong(0)
@@ -38,11 +41,20 @@ class RunManager(private val maxCompletedRuns: Int = 100) {
     private fun evictCompletedRuns() {
         val completed = runs.values
             .filter { it.handler.status() != "running" }
-            .sortedBy { it.sequenceNumber }
+            .sortedByDescending { it.sequenceNumber }
 
+        // Strip response bodies from runs beyond the full-response threshold
+        completed.drop(maxFullResponseRuns).forEach { run ->
+            if (!run.responsesStripped) {
+                run.store.stripResponseBodies()
+                run.responsesStripped = true
+            }
+        }
+
+        // Evict runs beyond the total retention limit
         val excess = completed.size - maxCompletedRuns
         if (excess > 0) {
-            completed.take(excess).forEach { run ->
+            completed.takeLast(excess).forEach { run ->
                 runs.remove(run.id)
                 evictedIds.add(run.id)
             }

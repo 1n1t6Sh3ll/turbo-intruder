@@ -120,6 +120,91 @@ class RunManagerTest {
     }
 
     @Test
+    fun `strips response bodies from runs beyond maxFullResponseRuns`() {
+        val manager = RunManager(maxCompletedRuns = 4, maxFullResponseRuns = 2)
+
+        val run1 = manager.startRun()
+        run1.handler.markScriptCompleted()
+        val req1 = burp.Request("GET /1 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody1"; id = 1
+        }
+        run1.store.add(req1)
+
+        val run2 = manager.startRun()
+        run2.handler.markScriptCompleted()
+        val req2 = burp.Request("GET /2 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody2"; id = 2
+        }
+        run2.store.add(req2)
+
+        val run3 = manager.startRun()
+        run3.handler.markScriptCompleted()
+        val req3 = burp.Request("GET /3 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody3"; id = 3
+        }
+        run3.store.add(req3)
+
+        // Trigger eviction — 3 completed, maxFullResponseRuns=2
+        val run4 = manager.startRun()
+
+        // run1 is oldest — should be stripped (beyond newest 2)
+        assertNull(req1.response)
+        assertTrue(run1.responsesStripped)
+        assertEquals(200, req1.code) // metadata preserved
+
+        // run2 and run3 should keep responses (newest 2 completed)
+        assertNotNull(req2.response)
+        assertFalse(run2.responsesStripped)
+        assertNotNull(req3.response)
+        assertFalse(run3.responsesStripped)
+    }
+
+    @Test
+    fun `does not re-strip already stripped runs`() {
+        val manager = RunManager(maxCompletedRuns = 4, maxFullResponseRuns = 1)
+
+        val run1 = manager.startRun()
+        run1.handler.markScriptCompleted()
+        val req1 = burp.Request("GET /1 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody1"; id = 1
+        }
+        run1.store.add(req1)
+
+        val run2 = manager.startRun()
+        run2.handler.markScriptCompleted()
+
+        // First trigger — strips run1
+        val run3 = manager.startRun()
+        assertTrue(run1.responsesStripped)
+
+        // Second trigger — run1 already stripped, should not error
+        run3.handler.markScriptCompleted()
+        val run4 = manager.startRun()
+        assertTrue(run1.responsesStripped)
+    }
+
+    @Test
+    fun `default maxFullResponseRuns is 50`() {
+        val manager = RunManager()
+        // Create 51 completed runs
+        val runs = (1..51).map {
+            manager.startRun().also { r ->
+                r.handler.markScriptCompleted()
+                val req = burp.Request("GET / HTTP/1.1").apply {
+                    response = "HTTP/1.1 200 OK\r\n\r\nBody"; id = 1
+                }
+                r.store.add(req)
+            }
+        }
+
+        // Trigger — 51 completed, oldest should be stripped
+        manager.startRun()
+
+        assertTrue(runs.first().responsesStripped)
+        assertFalse(runs.last().responsesStripped)
+    }
+
+    @Test
     fun `default cap is 100`() {
         val manager = RunManager()
         val runs = (1..101).map { manager.startRun().also { r -> r.handler.markScriptCompleted() } }
