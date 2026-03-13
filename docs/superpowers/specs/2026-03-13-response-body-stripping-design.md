@@ -29,9 +29,19 @@ RunManager manages completed runs in three tiers based on age (sequence number):
 
 **ActiveRun.kt** — Add `responsesStripped: Boolean = false` field. Set to `true` when RunManager strips the run. MCP tools can use this to return a clear message (e.g. "response bodies have been stripped from this run") instead of a confusing null.
 
-### Stripping trigger
+### Stripping triggers
 
-Stripping happens inside `evictCompletedRuns()`, which is called from `startRun()`. This keeps all cleanup logic in one place. The existing limitation (no eviction pressure without new runs) applies equally to stripping but is a separate concern.
+**On new run creation:** Stripping happens inside `evictCompletedRuns()`, called from `startRun()`. This applies the three-tier policy based on completed run count.
+
+**On memory pressure:** A daemon thread in RunManager polls available memory every 5 seconds (`Runtime.maxMemory() - Runtime.totalMemory() + Runtime.freeMemory()`). When available memory drops below 1GB, it progressively reclaims memory:
+
+1. First pass: strip response bodies from all completed runs (regardless of the 50-run threshold)
+2. If still under 1GB after stripping: evict oldest completed runs one at a time until memory recovers or no completed runs remain
+3. After each strip/evict action, call `System.gc()` and re-check
+
+The thread is started lazily on first `startRun()` call and runs for the lifetime of the RunManager. It uses the same `evictCompletedRuns()` method but with an `emergency: Boolean` parameter that bypasses the `maxFullResponseRuns` threshold.
+
+The 1GB threshold is a constant, not configurable.
 
 ### What is preserved after stripping
 
