@@ -124,6 +124,21 @@ class McpResourceHandlers(
         val request = run.store.getRequest(requestId)
             ?: return mapOf("error" to "request_not_found")
 
+        if (run.responsesStripped && request.response == null) {
+            return mapOf(
+                "warning" to "Response body was stripped from this run to free memory. Metadata is still available.",
+                "request" to request.getRequest(),
+                "status" to request.code,
+                "length" to request.length,
+                "ttfb" to request.ttfb,
+                "ttlb" to request.ttlb,
+                "wordcount" to request.wordcount,
+                "words" to request.words,
+                "label" to request.label,
+                "anomaly_rank" to request.anomalyRank
+            )
+        }
+
         if (exportFile) {
             val tempDir = createTempDirectory("turbo-${run.id}-").toFile()
             val requestFile = File(tempDir, "request-$requestId.txt")

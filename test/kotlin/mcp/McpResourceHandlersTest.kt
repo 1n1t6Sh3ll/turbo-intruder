@@ -1107,6 +1107,27 @@ class McpResourceHandlersTest {
     }
 
     @Test
+    fun `getRequestDetail indicates when response was stripped`() {
+        val run = manager.startRun()
+        val req = burp.Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req.id = 1
+        req.response = "HTTP/1.1 200 OK\r\n\r\nBody"
+        run.store.add(req)
+
+        // Strip
+        run.store.stripResponseBodies()
+        run.responsesStripped = true
+
+        val handlers = McpResourceHandlers(manager)
+        val result = handlers.getRequestDetail(run.id, 1)
+
+        assertTrue(result.containsKey("warning"))
+        assertTrue((result["warning"] as String).contains("stripped"))
+        // Metadata should still be present
+        assertEquals(200, result["status"])
+    }
+
+    @Test
     fun `hardcoded example list matches files in resources examples directory`() {
         val dir = File("resources/examples")
         assertTrue(dir.exists(), "resources/examples directory should exist")
