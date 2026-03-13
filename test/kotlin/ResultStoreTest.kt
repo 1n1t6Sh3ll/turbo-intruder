@@ -273,4 +273,25 @@ class ResultStoreTest {
         assertNull(store.getRequestByIndex(1))
         assertNull(store.getRequestByIndex(999))
     }
+
+    @Test
+    fun `stripResponseBodies nulls all response bodies but preserves metadata`() {
+        val req1 = Request("GET /1 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody1"
+            id = 1
+        }
+        val req2 = Request("GET /2 HTTP/1.1").apply {
+            response = "HTTP/1.1 404 Not Found\r\n\r\nBody2"
+            id = 2
+        }
+        store.add(req1)
+        store.add(req2)
+
+        store.stripResponseBodies()
+
+        assertNull(req1.response)
+        assertNull(req2.response)
+        assertEquals(200, req1.code)
+        assertEquals(404, req2.code)
+    }
 }

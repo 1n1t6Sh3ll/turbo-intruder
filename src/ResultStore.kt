@@ -27,6 +27,12 @@ class ResultStore : OutputHandler {
         synchronized(results) { results.clear() }
     }
 
+    fun stripResponseBodies() {
+        synchronized(results) {
+            results.forEach { it.stripResponseBody() }
+        }
+    }
+
     fun getRequest(id: Int): Request? {
         return synchronized(results) { results.find { it.id == id } }
     }
