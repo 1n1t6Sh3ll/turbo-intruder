@@ -205,6 +205,99 @@ class RunManagerTest {
     }
 
     @Test
+    fun `emergencyCleanup strips all completed runs regardless of threshold`() {
+        val manager = RunManager(maxCompletedRuns = 100, maxFullResponseRuns = 50)
+
+        val run1 = manager.startRun()
+        run1.handler.markScriptCompleted()
+        val req1 = burp.Request("GET /1 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody1"; id = 1
+        }
+        run1.store.add(req1)
+
+        val run2 = manager.startRun()
+        run2.handler.markScriptCompleted()
+        val req2 = burp.Request("GET /2 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody2"; id = 2
+        }
+        run2.store.add(req2)
+
+        // Emergency cleanup should strip even though we're under maxFullResponseRuns (50)
+        manager.emergencyCleanup()
+
+        assertTrue(run1.responsesStripped)
+        assertTrue(run2.responsesStripped)
+        assertNull(req1.response)
+        assertNull(req2.response)
+        // Runs are still accessible (not evicted)
+        assertNotNull(manager.getRun(run1.id))
+        assertNotNull(manager.getRun(run2.id))
+    }
+
+    @Test
+    fun `emergencyCleanup evicts oldest stripped runs if all already stripped`() {
+        val manager = RunManager(maxCompletedRuns = 100, maxFullResponseRuns = 50)
+
+        val run1 = manager.startRun()
+        run1.handler.markScriptCompleted()
+        run1.store.add(burp.Request("GET /1 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody"; id = 1
+        })
+
+        val run2 = manager.startRun()
+        run2.handler.markScriptCompleted()
+        run2.store.add(burp.Request("GET /2 HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody"; id = 2
+        })
+
+        // First emergency — strips all
+        manager.emergencyCleanup()
+        assertTrue(run1.responsesStripped)
+        assertTrue(run2.responsesStripped)
+
+        // Second emergency — evicts oldest since all already stripped
+        manager.emergencyCleanup()
+        assertNull(manager.getRun(run1.id))
+        assertTrue(manager.isEvicted(run1.id))
+        assertNotNull(manager.getRun(run2.id)) // newest kept
+    }
+
+    @Test
+    fun `emergencyCleanup does not evict running runs`() {
+        val manager = RunManager(maxCompletedRuns = 100, maxFullResponseRuns = 50)
+
+        val runningRun = manager.startRun() // still running
+        val completedRun = manager.startRun()
+        completedRun.handler.markScriptCompleted()
+        completedRun.store.add(burp.Request("GET / HTTP/1.1").apply {
+            response = "HTTP/1.1 200 OK\r\n\r\nBody"; id = 1
+        })
+
+        // First emergency — strips completed
+        manager.emergencyCleanup()
+        assertTrue(completedRun.responsesStripped)
+
+        // Second emergency — evicts completed, keeps running
+        manager.emergencyCleanup()
+        assertNull(manager.getRun(completedRun.id))
+        assertNotNull(manager.getRun(runningRun.id))
+    }
+
+    @Test
+    fun `startMemoryMonitor starts a daemon thread`() {
+        val manager = RunManager()
+        manager.startMemoryMonitor()
+
+        // Thread should be running — verify by checking it's a daemon
+        val thread = Thread.getAllStackTraces().keys.find { it.name == "turbo-memory-monitor" }
+        assertNotNull(thread, "Memory monitor thread should exist")
+        assertTrue(thread!!.isDaemon, "Memory monitor thread should be daemon")
+
+        // Cleanup
+        manager.stopMemoryMonitor()
+    }
+
+    @Test
     fun `default cap is 100`() {
         val manager = RunManager()
         val runs = (1..101).map { manager.startRun().also { r -> r.handler.markScriptCompleted() } }
