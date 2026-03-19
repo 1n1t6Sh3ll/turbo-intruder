@@ -22,12 +22,8 @@ DETECT_REFLECTION = True
 
 PATH_RE = re.compile(r'(?<!/)/[a-zA-Z0-9._~\-][a-zA-Z0-9._~\-/%+:]*(?:\?[^\s"\'<>]*)?')
 MAX = 500
-CANARY = randstr()
 
 LINK_CONTENT_TYPES = ['text/html', 'text/plain', 'javascript', 'xml']
-
-seen = set()
-count = 0
 
 
 def should_extract_links(response):
@@ -39,19 +35,47 @@ def should_extract_links(response):
     return True  # no Content-Type header -> extract
 
 
-def queue_path(engine, template, path):
-    global count
-    if count >= MAX:
-        return
-    dedup = path.split('?')[0]
-    if dedup in seen:
-        return
-    seen.add(dedup)
-    count += 1
-    if DETECT_REFLECTION:
-        sep = '&' if '?' in path else '?'
-        path = path + sep + 'z=' + CANARY
-    engine.queue(template, path, label=dedup)
+class MicroCrawl:
+    def __init__(self, canary=None, detect_reflection=DETECT_REFLECTION, max_requests=MAX):
+        self.seen = set()
+        self.count = 0
+        self.canary = canary or randstr()
+        self.detect_reflection = detect_reflection
+        self.max_requests = max_requests
+        self.results = []
+
+    def queue_path(self, engine, template, path):
+        if self.count >= self.max_requests:
+            return
+        dedup = path.split('?')[0]
+        if dedup in self.seen:
+            return
+        self.seen.add(dedup)
+        self.count += 1
+        actual_path = path
+        if self.detect_reflection:
+            sep = '&' if '?' in path else '?'
+            actual_path = path + sep + 'z=' + self.canary
+        engine.queue(template, actual_path, label=dedup)
+
+    def handle_response(self, req, table):
+        if req.status == 0:
+            return
+
+        if should_extract_links(req.response):
+            for path in PATH_RE.findall(req.response or ''):
+                self.queue_path(req.engine, req.template, path)
+
+        if req.status != 404:
+            if self.detect_reflection and self.canary in (req.response or ''):
+                req.label = req.label + ' reflection'
+            self.results.append({'path': req.label, 'status': req.status, 'response': req.response})
+            table.add(req)
+
+
+# --- Standalone mode ---
+
+_crawl = MicroCrawl()
 
 
 def queueRequests(target, wordlists):
@@ -67,21 +91,11 @@ def queueRequests(target, wordlists):
     base = HttpRequest.httpRequestFromUrl(target.endpoint + "/").toString()
     template = base.replace("GET / ", "GET %s ", 1)
 
-    queue_path(engine, template, '/')
+    _crawl.queue_path(engine, template, '/')
     for word in WORDLIST:
         path = word if word.startswith('/') else '/' + word
-        queue_path(engine, template, path)
+        _crawl.queue_path(engine, template, path)
 
 
 def handleResponse(req, interesting):
-    if req.status == 0:
-        return
-
-    if should_extract_links(req.response):
-        for path in PATH_RE.findall(req.response or ''):
-            queue_path(req.engine, req.template, path)
-
-    if req.status != 404:
-        if DETECT_REFLECTION and CANARY in (req.response or ''):
-            req.label = req.label + ' reflection'
-        table.add(req)
+    _crawl.handle_response(req, table)
