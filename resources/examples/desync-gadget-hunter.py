@@ -23,6 +23,7 @@ CRAWL_MAX = 500
 LINK_CONTENT_TYPES = ['text/html', 'text/plain', 'javascript', 'xml']
 
 MARKER = 'esmxfzq'
+HEADER_PROBE = 'wrt<'
 
 
 # --- Crawl helpers (from micro-crawl.py) ---
@@ -77,17 +78,25 @@ def extract_root_folders(paths):
 
 # --- Request builders ---
 
-def make_request(path, host, extra_headers=None, absolute_url_host=None):
+def make_request(path, host, extra_headers=None, absolute_url_host=None, body=None, method=None):
+    if method is None:
+        method = 'POST' if body is not None else 'GET'
     if absolute_url_host:
-        request_line = 'GET https://' + absolute_url_host + path + ' HTTP/1.1'
+        request_line = method + ' https://' + absolute_url_host + path + ' HTTP/1.1'
     else:
-        request_line = 'GET ' + path + ' HTTP/1.1'
+        request_line = method + ' ' + path + ' HTTP/1.1'
     lines = [request_line, 'Host: ' + host]
     if extra_headers:
         lines.extend(extra_headers)
+    if body is not None:
+        lines.append('Content-Type: application/x-www-form-urlencoded')
+        lines.append('Content-Length: ' + str(len(body)))
     lines.append('Connection: close')
     lines.append('')
-    lines.append('')
+    if body is not None:
+        lines.append(body)
+    else:
+        lines.append('')
     return '\r\n'.join(lines)
 
 
@@ -149,12 +158,60 @@ def handle_redir_test(req, host):
     return True
 
 
+# --- Scan: find_header_reflect ---
+
+def get_response_headers(response):
+    if not response:
+        return ''
+    return response.split('\r\n\r\n')[0]
+
+
+def queue_header_reflect_tests(engine, host, path):
+    """Queue tests to check if input is reflected unencoded in response headers."""
+
+    # Test 1: Query string parameter
+    sep = '&' if '?' in path else '?'
+    engine.queue(make_request(path + sep + 'wrt=' + HEADER_PROBE, host),
+                 label='header-reflect:query:' + path)
+
+    # Test 2: In the path
+    engine.queue(make_request(path + '/' + HEADER_PROBE, host),
+                 label='header-reflect:path:' + path)
+
+    # Test 3: X-Request-ID header
+    engine.queue(make_request(path, host, extra_headers=[
+        'X-Request-ID: ' + HEADER_PROBE,
+    ]), label='header-reflect:xrid:' + path)
+
+
+def handle_header_reflect_test(req):
+    """Handle a header reflection test response. Returns True if handled."""
+    label = req.label or ''
+    if not label.startswith('header-reflect:'):
+        return False
+
+    headers = get_response_headers(req.response)
+    rest = label[len('header-reflect:'):]
+    colon = rest.find(':')
+    test_type = rest[:colon] if colon >= 0 else rest
+    path = rest[colon + 1:] if colon >= 0 else ''
+
+    if HEADER_PROBE in headers:
+        req.label = 'header-reflect:' + test_type + ' ' + path
+        table.add(req)
+
+    return True
+
+
 # --- Main orchestration ---
 
 _crawl_seen = set()
 _crawl_count = 0
 _canary = None
 _redirect_probed = set()
+_normalization_probed = set()
+_header_reflect_probed = set()
+_body_reflect_probed = set()
 _host = None
 _pre_seeded = False
 
@@ -181,13 +238,63 @@ def _queue_redirect_probe(engine, path):
     engine.queue(make_request(path, _host), label='redir-probe:' + path)
 
 
+def _queue_normalization_probes(engine, path):
+    if path in _normalization_probed:
+        return
+    _normalization_probed.add(path)
+
+    # Case normalization (IIS especially): toggle case of first alpha char in last segment
+    segments = path.rstrip('/').rsplit('/', 1)
+    if len(segments) == 2 and segments[1]:
+        last = segments[1]
+        for i, ch in enumerate(last):
+            if ch.isalpha():
+                toggled = ch.lower() if ch.isupper() else ch.upper()
+                mutated_last = last[:i] + toggled + last[i+1:]
+                mutated_path = segments[0] + '/' + mutated_last
+                if path.endswith('/'):
+                    mutated_path += '/'
+                engine.queue(make_request(mutated_path, _host), label='redir-probe:case:' + path)
+                break
+
+    # Double slash: //path
+    engine.queue(make_request('/' + path, _host), label='redir-probe:dslash:' + path)
+
+    # Dot segment: /./path and /%2e/path
+    engine.queue(make_request('/.' + path, _host), label='redir-probe:dot:' + path)
+    engine.queue(make_request('/%2e' + path, _host), label='redir-probe:enc-dot:' + path)
+
+    # Encoded slash (trailing): /path%2f
+    engine.queue(make_request(path.rstrip('/') + '%2f', _host), label='redir-probe:enc-slash:' + path)
+
+    # Encoded slash (leading): /%2fpath
+    engine.queue(make_request('/%2f' + path.lstrip('/'), _host), label='redir-probe:enc-slash:' + path)
+
+
+def _queue_header_reflect_probe(engine, path):
+    if path in _header_reflect_probed:
+        return
+    _header_reflect_probed.add(path)
+    queue_header_reflect_tests(engine, _host, path)
+
+
+def _queue_body_reflect_probe(engine, path):
+    if path in _body_reflect_probed:
+        return
+    _body_reflect_probed.add(path)
+    engine.queue(make_request(path, _host, body='z=' + MARKER, method='POST'),
+                 label='body-reflect:post:' + path)
+    engine.queue(make_request(path, _host, body='z=' + MARKER, method='GET'),
+                 label='body-reflect:get:' + path)
+
+
 def queueRequests(target, wordlists):
     global _canary, _host, _pre_seeded
     _canary = randstr()
     _host = target.endpoint.replace('https://', '').replace('http://', '').split(':')[0].split('/')[0]
 
     engine = RequestEngine(endpoint=target.endpoint,
-                           concurrentConnections=1,
+                           concurrentConnections=5,
                            requestsPerConnection=100,
                            pipeline=False,
                            engine=Engine.BURP,
@@ -208,11 +315,14 @@ def queueRequests(target, wordlists):
         # Queue redirect probes: root folders + special paths
         for folder in extract_root_folders(paths):
             _queue_redirect_probe(engine, folder)
+            _queue_normalization_probes(engine, folder)
 
         # Re-probe paths that were redirects in the crawl
         for r in crawl_results:
             if is_redirect(r.get('status', 0)):
                 _queue_redirect_probe(engine, r['path'])
+                _queue_normalization_probes(engine, r['path'])
+                _queue_header_reflect_probe(engine, r['path'])
     else:
         # Full mode: crawl first, scans run as redirects are discovered
         _pre_seeded = False
@@ -221,8 +331,8 @@ def queueRequests(target, wordlists):
             path = word if word.startswith('/') else '/' + word
             _queue_crawl_path(engine, template, path)
 
-    # Always probe these special paths
-    _queue_redirect_probe(engine, '/%2f')
+    # Always probe root with normalization transforms
+    _queue_normalization_probes(engine, '/')
 
 
 def handleResponse(req, interesting):
@@ -231,17 +341,42 @@ def handleResponse(req, interesting):
 
     label = req.label or ''
 
+    # Handle body reflection tests
+    if label.startswith('body-reflect:'):
+        rest = label[len('body-reflect:'):]
+        colon = rest.find(':')
+        test_type = rest[:colon] if colon >= 0 else rest
+        path = rest[colon + 1:] if colon >= 0 else ''
+        if MARKER in (req.response or ''):
+            req.label = 'body-reflect:' + test_type + ' ' + path
+            table.add(req)
+        return
+
+    # Handle header reflection tests
+    if handle_header_reflect_test(req):
+        return
+
     # Handle redirect exploitation tests
     if handle_redir_test(req, _host):
         return
 
     # Handle redirect probes
     if label.startswith('redir-probe:'):
-        path = label[len('redir-probe:'):]
+        rest = label[len('redir-probe:'):]
+        # Labels: redir-probe:/path (plain) or redir-probe:type:/path (normalization)
+        if rest.startswith('/'):
+            probe_type = None
+            path = rest
+        else:
+            colon = rest.find(':')
+            probe_type = rest[:colon] if colon >= 0 else rest
+            path = rest[colon + 1:] if colon >= 0 else rest
         if is_local_redirect(req.status, req.response, _host):
-            req.label = 'redir:local ' + path
+            tag = probe_type or 'local'
+            req.label = 'redir:' + tag + ' ' + path
             table.add(req)
             queue_redirect_tests(req.engine, _host, path)
+            _queue_header_reflect_probe(req.engine, path)
         return
 
     # Handle crawl responses
@@ -254,6 +389,7 @@ def handleResponse(req, interesting):
         if req.status != 404:
             if _canary and _canary in (req.response or ''):
                 req.label = path + ' reflection'
+                _queue_body_reflect_probe(req.engine, path)
             else:
                 req.label = path
             table.add(req)
@@ -262,7 +398,10 @@ def handleResponse(req, interesting):
             parts = path.strip('/').split('/')
             if len(parts) > 1:
                 _queue_redirect_probe(req.engine, '/' + parts[0])
+                _queue_normalization_probes(req.engine, '/' + parts[0])
 
-            # If crawl itself found a redirect, probe it
+            # If crawl itself found a redirect, probe it and test header reflection
             if is_local_redirect(req.status, req.response, _host):
                 _queue_redirect_probe(req.engine, path)
+                _queue_normalization_probes(req.engine, path)
+                _queue_header_reflect_probe(req.engine, path)

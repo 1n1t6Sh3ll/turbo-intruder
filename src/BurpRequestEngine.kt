@@ -64,7 +64,7 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
     private fun request(service: IHttpService, req: Request) {
         if (useHTTP1) {
             val montoyaService = HttpService.httpService(service.host, service.port, "https".equals(service.protocol))
-            val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest()))
+            val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest()), HttpMode.HTTP_1)
             req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
             req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
             req.time = req.ttfb
@@ -213,7 +213,8 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                     connections.incrementAndGet()
                     val montoyaService =
                         HttpService.httpService(tempService.host, port, "https".equals(tempService.protocol))
-                    val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest().replace("HTTP/2\r\n","HTTP/1.1\r\n")))
+                    val protocolVersion = if (useHTTP1) HttpMode.HTTP_1 else HttpMode.HTTP_2
+                    val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest().replace("HTTP/2\r\n","HTTP/1.1\r\n")), protocolVersion)
                     req.response = montoyaResp.response().toString()
                     req.montoyaReq = montoyaResp
                     req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
@@ -246,6 +247,7 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
             } catch (ex: Exception) {
                 ex.printStackTrace()
                 Utils.err("Ignoring error: "+ex.toString())
+                lastError = ex.toString()
                 permaFails.getAndIncrement()
                 // todo add null response to table
                 continue

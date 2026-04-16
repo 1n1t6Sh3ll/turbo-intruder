@@ -123,6 +123,10 @@ class McpToolHandlers(
         )
         if (status == "failed") {
             result["error_message"] = run.handler.statusString()
+        } else if (run.store.count() == 0 && run.handler.failCount() > 0) {
+            val lastError = run.handler.lastError()
+            val msg = "All ${run.handler.failCount()} requests failed with connection errors"
+            result["error_message"] = if (lastError != null) "$msg: $lastError" else msg
         }
         normalized.warning?.let { result["warning"] = it }
         return result

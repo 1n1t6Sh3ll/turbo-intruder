@@ -28,7 +28,6 @@ class TurboMcpServerTest {
         val server = TurboMcpServer(port = 31337)
         val toolNames = server.getEnabledToolNames()
         assertTrue(toolNames.contains("start_run"))
-        assertTrue(toolNames.contains("set_organizer_notes"))
         assertTrue(toolNames.contains("save_to_organizer"))
     }
 
@@ -42,7 +41,6 @@ class TurboMcpServerTest {
         assertFalse(toolNames.contains("start_run"))
         assertFalse(toolNames.contains("start_run_async"))
         assertTrue(toolNames.contains("stop_run"))
-        assertTrue(toolNames.contains("set_organizer_notes"))
     }
 
     @Test

@@ -37,7 +37,7 @@ class McpResourceHandlers(
     private val discoveredExamples: Set<String> = setOf(
         "0cl-exploit", "0cl-find-offset", "0cl-poc",
         "apis", "basic", "benchmark-h1-race", "benchmark-h2-race",
-        "burpIntegration", "customSortOrder", "debug", "default",
+        "burpIntegration", "customSortOrder", "debug", "default", "desync-gadget-hunter",
         "email-link-extraction", "http2", "infinite", "micro-crawl",
         "misc", "multiHost", "multipleParameters", "outputToFile",
         "partialReadCallback", "pinwheel", "race-multi-endpoint",

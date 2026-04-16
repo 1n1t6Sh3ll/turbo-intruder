@@ -40,6 +40,7 @@ abstract class RequestEngine: IExtensionStateListener {
     var lastLife: Long = System.currentTimeMillis()
     abstract var idleTimeout: Long
     var fixContentLength: Boolean = true
+    var lastError: String? = null
 
     val internalSettings: HashMap<String, Any> = HashMap()
 
@@ -56,7 +57,7 @@ abstract class RequestEngine: IExtensionStateListener {
         }
 
         internalSettings["calculateAnomalyRank"] = true
-        internalSettings["anomalyRankAlgorithm"] = "local"
+        internalSettings["anomalyRankAlgorithm"] = "burp"
     }
 
     override fun extensionUnloaded() {
@@ -117,7 +118,7 @@ abstract class RequestEngine: IExtensionStateListener {
         }
 
         val request = buildRequest(template.replace("\$randomplz", RandomStringUtils.randomAlphanumeric(10).lowercase(), true), payloadsAsStrings, learnBoring, label)
-        request._engine = this
+        request.targetUrl = target
         if (pythonEngine != null) {
             request.engine = pythonEngine
         }
@@ -126,7 +127,7 @@ abstract class RequestEngine: IExtensionStateListener {
         }
 
         request.id = lastRequestID.incrementAndGet()
-        request.callback = callback
+        request.callback = callback ?: { req, interesting -> this.callback(req, interesting) ?: false }
         request.pauseBefore = pauseBefore
         request.pauseTime = pauseTime
         request.pauseMarkers = pauseMarkers
@@ -315,33 +316,23 @@ abstract class RequestEngine: IExtensionStateListener {
             }
             Utils.err("Anomaly rank: getAllRequests=${System.currentTimeMillis() - t0}ms (${allRequests.size} requests)")
 
-            // Convert Request objects to Montoya HttpRequestResponse objects, preserving mapping
-            val t1 = System.currentTimeMillis()
-            val requestsWithMontoya = allRequests.mapNotNull { req ->
-                req.getMontoyaRequest()?.let { montoya -> req to montoya }
-            }
-            allRequests.filter { it.getMontoyaRequest() == null }.forEach { it.anomalyRank = -1 }
-            if (requestsWithMontoya.isEmpty()) {
-                return
-            }
-            Utils.err("Anomaly rank: convertToMontoya=${System.currentTimeMillis() - t1}ms")
-
             val algorithm = internalSettings["anomalyRankAlgorithm"] as? String ?: "burp"
-            val t2 = System.currentTimeMillis()
+            val t1 = System.currentTimeMillis()
 
             if (algorithm == "local") {
-                // Try to load and invoke the local anomaly ranker via reflection
+                // Local ranker streams Montoya conversion internally — no need to
+                // pre-build all Montoya objects, saving ~2x response memory
                 try {
                     val rankerClass = Class.forName("burp.LocalAnomalyRanker")
                     val rankMethod = rankerClass.getMethod("rank", List::class.java)
-                    rankMethod.invoke(null, requestsWithMontoya)
-                    Utils.err("Anomaly rank: localAlgorithm=${System.currentTimeMillis() - t2}ms")
+                    rankMethod.invoke(null, allRequests)
+                    Utils.err("Anomaly rank: localAlgorithm=${System.currentTimeMillis() - t1}ms")
                 } catch (e: ClassNotFoundException) {
                     Utils.err("LocalAnomalyRanker not found, falling back to burp algorithm")
-                    runBurpRanking(requestsWithMontoya, t2)
+                    runBurpRanking(allRequests, t1)
                 }
             } else {
-                runBurpRanking(requestsWithMontoya, t2)
+                runBurpRanking(allRequests, t1)
             }
 
             // Notify the table model to update the UI
@@ -364,8 +355,18 @@ abstract class RequestEngine: IExtensionStateListener {
         }
     }
 
-    private fun runBurpRanking(requestsWithMontoya: List<Pair<Request, burp.api.montoya.http.message.HttpRequestResponse>>, startTime: Long) {
+    private fun runBurpRanking(allRequests: List<Request>, startTime: Long) {
         try {
+            val t0 = System.currentTimeMillis()
+            val requestsWithMontoya = allRequests.mapNotNull { req ->
+                req.getMontoyaRequest()?.let { montoya -> req to montoya }
+            }
+            val withMontoyaSet = requestsWithMontoya.map { it.first }.toHashSet()
+            allRequests.filter { it !in withMontoyaSet }.forEach { it.anomalyRank = -1 }
+            if (requestsWithMontoya.isEmpty()) return
+            Utils.err("Anomaly rank: burpConvertToMontoya=${System.currentTimeMillis() - t0}ms")
+
+            val t1 = System.currentTimeMillis()
             val montoyaRequests = requestsWithMontoya.map { it.second }
             val rankedRequests = Utils.montoyaApi.utilities().rankingUtils().rank(montoyaRequests)
 
@@ -374,17 +375,13 @@ abstract class RequestEngine: IExtensionStateListener {
                     requestsWithMontoya[i].first.anomalyRank = rankedRequests[i].rank()
                 }
             }
-            Utils.err("Anomaly rank: burpAlgorithm=${System.currentTimeMillis() - startTime}ms")
+            Utils.err("Anomaly rank: burpAlgorithm=${System.currentTimeMillis() - t1}ms, total=${System.currentTimeMillis() - startTime}ms")
         } catch (e: NoSuchMethodError) {
             Utils.err("Anomaly ranking API not available in Burp versions below 2025.10")
-            for ((request, _) in requestsWithMontoya) {
-                request.anomalyRank = 0
-            }
+            allRequests.forEach { it.anomalyRank = 0 }
         } catch (e: NoClassDefFoundError) {
             Utils.err("Anomaly ranking API not available in Burp versions below 2025.10")
-            for ((request, _) in requestsWithMontoya) {
-                request.anomalyRank = 0
-            }
+            allRequests.forEach { it.anomalyRank = 0 }
         }
     }
 

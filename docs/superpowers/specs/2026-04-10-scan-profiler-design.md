@@ -1,12 +1,12 @@
-# ScanProfiler: Performance Profiling Harness for ScanEngine
+# ScanProfiler: Performance Profiling Harness for VThreadRequestEngine
 
 ## Overview
 
-An in-process profiling harness for ScanEngine that enables an AI agent to measure performance, identify bottlenecks, and validate optimisations. Runs as JUnit tests with an embedded mock server, producing structured JSON reports and JFR recordings.
+An in-process profiling harness for VThreadRequestEngine that enables an AI agent to measure performance, identify bottlenecks, and validate optimisations. Runs as JUnit tests with an embedded mock server, producing structured JSON reports and JFR recordings.
 
 ## Key Decisions
 
-1. **In-process:** Mock server, ScanEngine, and profiler all run in one JVM. Simplicity and fast iteration outweigh resource isolation concerns — the mock is lightweight (mostly idle threads accepting and writing bytes).
+1. **In-process:** Mock server, VThreadRequestEngine, and profiler all run in one JVM. Simplicity and fast iteration outweigh resource isolation concerns — the mock is lightweight (mostly idle threads accepting and writing bytes).
 2. **Stateless reports:** Each run produces a self-contained JSON file. The agent loads and compares reports itself. No run history database.
 3. **Phase-level + system-level + JFR:** Three layers of bottleneck attribution. Phase timing says *where*, system metrics say *why*, JFR says *which code path*.
 4. **Tiered scale presets:** `SMALL` (1K hosts), `MEDIUM` (10K), `LARGE` (50K). Agent picks based on what it's investigating.
@@ -19,10 +19,9 @@ An in-process profiling harness for ScanEngine that enables an AI agent to measu
 An embedded TLS server simulating many hosts on localhost.
 
 **Design:**
-- Single `ServerSocket` listener on one port, bound to `127.0.0.1` (or `0.0.0.0`)
-- Host list uses 50K distinct loopback addresses (`127.x.x.x`) from the `127.0.0.0/8` block. The OS routes all loopback traffic to one interface, so the single listener accepts connections from all addresses. ScanEngine sees genuinely different IPs — exercises per-IP connection behaviour and ephemeral port distribution.
+- Single `ServerSocket` listener on one port, bound to `127.0.0.1`
+- All hosts connect to the same `127.0.0.1` address. Host identity is determined by the `Host` header in the request, not by distinct IPs.
 - TLS via self-signed certificate
-- Host behaviour determined by `Host` header in the request
 
 **Response profiles:**
 
@@ -31,23 +30,22 @@ An embedded TLS server simulating many hosts on localhost.
 | Normal | Immediate 200, configurable body size | 90% |
 | Slow | Configurable delay before response | 5% |
 | Hanging | Accepts connection, never responds | 3% |
-| Large body | Response exceeding ScanEngine's body cap | 1% |
+| Large body | Response exceeding VThreadRequestEngine's body cap | 1% |
 | Connection reset | Accepts then immediately closes | 1% |
 
-**What it doesn't simulate:** DNS resolution (ScanEngine receives pre-resolved addresses), real TLS certificate chains (self-signed throughout). These are covered by real-target runs.
+**What it doesn't simulate:** DNS resolution (VThreadRequestEngine receives pre-resolved addresses), real TLS certificate chains (self-signed throughout). These are covered by real-target runs.
 
 ### Host/IP Generation
 
-At startup, based on the tier, generate synthetic hosts:
-- `host-0000.mock` → `127.0.0.1`
-- `host-0001.mock` → `127.0.0.2`
-- ...up to tier limit
+At startup, based on the tier, generate synthetic hostnames:
+- `host-0000.mock`, `host-0001.mock`, ...up to tier limit
+- All resolve to `127.0.0.1`
 
 Each host is assigned a response profile based on the configured distribution. The mapping is deterministic (seeded) for reproducibility.
 
 ## Phase Timing Instrumentation
 
-Baked into ScanEngine's `sendRequest()`, not added by the harness. Available for real-target runs too.
+Baked into VThreadRequestEngine's `sendRequest()`, not added by the harness. Available for real-target runs too.
 
 ### Phases
 
@@ -76,8 +74,8 @@ A daemon thread samples system-level metrics every 500ms during a run.
 |--------|--------|
 | Heap used / max | `MemoryMXBean` |
 | GC count, cumulative pause time | `GarbageCollectorMXBean` |
-| Live virtual thread count | Counter maintained by ScanEngine |
-| Carrier thread pool utilisation | `ForkJoinPool.commonPool()` metrics |
+| Live virtual thread count | Counter maintained by VThreadRequestEngine |
+| Carrier thread pool utilisation | JFR `jdk.VirtualThreadPinned` / `jdk.ThreadPark` events (the carrier pool is `jdk.virtualThreadScheduler`, not `commonPool()`) |
 | Open file descriptor count | `OperatingSystemMXBean.getOpenFileDescriptorCount()` |
 
 Stored as a list of timestamped snapshots, written into the JSON report as a `systemMetrics` array.
@@ -166,7 +164,7 @@ class ScanProfiler(
     val hostProfiles: HostProfileConfig = HostProfileConfig.DEFAULT,
     val jfrEnabled: Boolean = true
 ) {
-    fun run(scanCheck: (ScanEngine) -> Unit): ProfileReport
+    fun run(scanCheck: (VThreadRequestEngine) -> Unit): ProfileReport
 }
 
 enum class Tier(val hostCount: Int) {
@@ -186,11 +184,22 @@ data class HostProfileConfig(
 )
 ```
 
+### CLI Entry Point
+
+```bash
+java -jar build/libs/turbo-intruder.jar --profile [--tier small|medium|large] [--jfr]
+```
+
+Runs the profiler, writes JSON report and optional JFR file to `build/profiler-runs/`, prints the report path to stdout.
+
 **Agent workflow:**
-1. Instantiate `ScanProfiler` with desired tier
-2. Call `run { engine -> ... }` with a lambda exercising ScanEngine
-3. Receive `ProfileReport` — serialises to JSON, references the `.jfr` file
-4. Compare with previous reports by loading JSON
+1. Run the CLI command with desired tier
+2. Read the JSON report from the output path
+3. Compare with previous reports by loading JSON
+
+## Dependencies
+
+- **VThreadRequestEngine must be built first.** The harness API takes a `(VThreadRequestEngine) -> Unit` lambda, so the engine is a compile-time dependency.
 
 ## Out of Scope
 
@@ -198,4 +207,4 @@ data class HostProfileConfig(
 - Two-process or external orchestrator mode
 - Custom JFR event definitions
 - DNS simulation (covered by real-target runs)
-- Integration with MCP tools (the harness is for offline profiling)
+- MCP integration (may add later)

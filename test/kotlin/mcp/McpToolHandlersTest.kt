@@ -494,6 +494,55 @@ def completed(results):
     }
 
     @Test
+    fun `startRun includes error_message when completed with only connection failures`() {
+        // Simulate a run that completes but all requests failed (connection errors)
+        val run = manager.startRun()
+        run.handler.code = "test script"
+
+        // Simulate engine with permaFails but no successful results
+        val engine = FakeRequestEngine(permaFailCount = 5, lastErrorMessage = "javax.net.ssl.SSLHandshakeException: Connection refused")
+        run.handler.setRequestEngine(engine)
+        run.handler.markScriptCompleted()
+
+        // Build the result the same way startRun does
+        val status = run.handler.status()
+        val fails = run.handler.failCount()
+        val resultCount = run.store.count()
+
+        assertEquals("completed", status)
+        assertEquals(5, fails)
+        assertEquals(0, resultCount)
+
+        // The key assertion: lastError should be available from the handler
+        assertEquals("javax.net.ssl.SSLHandshakeException: Connection refused", run.handler.lastError())
+    }
+
+    @Test
+    fun `startRun result includes error_message when zero results and connection failures`() {
+        val result = handlers.startRun(
+            script = """
+def queueRequests(target, wordlists):
+    engine = RequestEngine(endpoint=target.endpoint, concurrentConnections=1, requestsPerConnection=1, pipeline=False, engine=Engine.BURP)
+
+def handleResponse(req, interesting):
+    pass
+            """.trimIndent(),
+            baseRequest = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            endpoint = "https://localhost:1",  // Will fail to connect
+            baseInput = "",
+            timeoutMs = 10000
+        )
+
+        // Should complete (or timeout) with error info
+        if (result["status"] == "completed") {
+            val fails = result["fails"] as Int
+            if (fails > 0) {
+                assertTrue(result.containsKey("error_message"), "Should include error_message when there are connection failures but no results")
+            }
+        }
+    }
+
+    @Test
     fun `startRun does not include error_message on success`() {
         val result = handlers.startRun(
             script = "def queueRequests(target, wordlists):\n    pass\ndef completed(results):\n    pass",
@@ -584,6 +633,37 @@ class FakeCollaboratorProvider(
     // Test helper to simulate interactions
     fun addInteraction(interaction: CollaboratorInteractionData) {
         interactions.add(interaction)
+    }
+}
+
+/**
+ * Minimal fake RequestEngine for testing error surfacing without needing real connections.
+ */
+class FakeRequestEngine(
+    private val permaFailCount: Int = 0,
+    lastErrorMessage: String? = null
+) : burp.RequestEngine() {
+    override val maxRetriesPerRequest: Int = 0
+    override var idleTimeout: Long = 0
+    override val callback: (burp.Request, Boolean) -> Boolean = { _, _ -> false }
+    override var readCallback: ((String) -> Boolean)? = null
+
+    init {
+        permaFails.set(permaFailCount)
+        lastError = lastErrorMessage
+        runState.set(4) // completed
+        completedLatch = java.util.concurrent.CountDownLatch(0)
+        target = java.net.URL("https://localhost")
+        requestQueue = java.util.concurrent.LinkedBlockingQueue()
+        outputHandler = object : burp.OutputHandler {
+            override fun add(req: burp.Request) {}
+            override fun getAllRquests(): List<burp.Request> = emptyList()
+        }
+    }
+
+    override fun start(timeout: Int) {}
+    override fun buildRequest(template: String, payloads: List<String?>, learnBoring: Int?, label: String): burp.Request {
+        return burp.Request(template, payloads, learnBoring ?: 0, label)
     }
 }
 

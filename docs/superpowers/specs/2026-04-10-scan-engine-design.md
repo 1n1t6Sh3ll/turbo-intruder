@@ -1,49 +1,54 @@
-# ScanEngine: Mass-Scale HTTP/1 Library
+# VThreadHttpLib + VThreadRequestEngine
 
 ## Overview
 
-A new HTTP/1 engine for Turbo Intruder optimised for sending 1-100 requests to 50,000 websites concurrently. Designed for security scanning use cases requiring raw socket control, crafted/malformed requests, and precise timing.
+Two layers:
+
+1. **VThreadHttpLib** — The primary deliverable. A standalone HTTP/1 library using Java 25 virtual threads. Blocking socket IO, raw request bytes in, parsed responses out. Designed for high-concurrency use cases (50K+ simultaneous connections) requiring raw socket control, crafted/malformed requests, and precise timing. This is the foundation for all future HTTP/1 work in Turbo Intruder.
+
+2. **VThreadRequestEngine** — A thin `RequestEngine` subclass that uses VThreadHttpLib as its transport. Exists to plug VThreadHttpLib into Turbo Intruder's existing ecosystem (RunHandler, MCP, UI) and provide a migration path off `ThreadedRequestEngine`. Supports multi-host runs via the existing `endpointOverride` parameter on queued requests.
 
 ## Key Decisions
 
-1. **Concurrency model:** Java 21 virtual threads. One virtual thread per host, 50K concurrent. Blocking IO throughout — no NIO, no coroutines.
-2. **Fork strategy:** ScanEngine gets its own copy of the HTTP/1 socket and parsing code, forked from `ThreadedRequestEngine`. No shared layer. Free to diverge. `ThreadedRequestEngine` stays frozen, eventually deprecated, probably never removed.
-3. **Transport only:** The library sends raw bytes and returns parsed responses. Request construction is the caller's responsibility.
+1. **Concurrency model:** Java 25 virtual threads. Blocking IO throughout — no NIO, no coroutines.
+2. **Fork strategy:** VThreadHttpLib gets its own copy of the HTTP/1 socket and parsing code, forked from `ThreadedRequestEngine`. No shared layer. Free to diverge. `ThreadedRequestEngine` stays frozen, eventually deprecated, probably never removed.
+3. **Transport only (library layer):** The library sends raw bytes and returns parsed responses. Request construction is the caller's responsibility.
 4. **Java API:** Public API uses standard Java types. No Kotlin-specific types (no `suspend`, `Flow`, inline classes).
 5. **Direct to targets:** Connections go direct to hosts, not through Burp's HTTP stack.
-6. **TLS first-class:** Virtually all targets will be HTTPS. TLS handshake performance is a primary concern.
-7. **Timeouts:** `socket.soTimeout` for per-request timeouts. `StructuredTaskScope.joinUntil()` for per-host scancheck deadlines.
+6. **TLS first-class:** Virtually all targets will be HTTPS. TLS certificate verification is disabled — the library accepts all certificates (security tooling connects to arbitrary hosts). TLS handshake performance is a primary concern.
+7. **Timeouts:** `socket.soTimeout` for per-request timeouts. Per-host wall-clock deadline by tracking elapsed time and shrinking remaining socket timeouts before each phase.
 
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────┐
-│                  ScanEngine                   │
-│                                               │
-│  scan(hosts, check) launches 50K virtual      │
-│  threads via StructuredTaskScope              │
-│                                               │
-│  ┌─────────────┐  ┌─────────────┐            │
-│  │  VThread 1  │  │  VThread N  │  ...50K    │
-│  │  host-a.com │  │  host-n.com │            │
-│  │             │  │             │            │
-│  │ scancheck() │  │ scancheck() │            │
-│  │  sendReq()  │  │  sendReq()  │            │
-│  │  sendReq()  │  │  sendReq()  │            │
-│  └──────┬──────┘  └──────┬──────┘            │
-│         │                │                    │
-│         ▼                ▼                    │
-│  ┌────────────────────────────────┐          │
-│  │   HTTP/1 Socket Layer (forked) │          │
-│  │   connect, TLS, send, parse    │          │
-│  │   (own copy, free to evolve)   │          │
-│  └────────────────────────────────┘          │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│             VThreadRequestEngine                  │
+│             (extends RequestEngine)               │
+│                                                   │
+│  queue() → virtual thread per request             │
+│  endpointOverride → route to different hosts      │
+│  Integrates with RunHandler, MCP, UI              │
+│                                                   │
+│  ┌──────────────────────────────────────────┐    │
+│  │           VThreadHttpLib                  │    │
+│  │                                           │    │
+│  │  connect(host, port) → Connection         │    │
+│  │  Connection.send(bytes) → Response        │    │
+│  │                                           │    │
+│  │  Virtual threads + blocking sockets       │    │
+│  │  Own HTTP/1 parser (forked)               │    │
+│  │  TLS with cert verification disabled      │    │
+│  └──────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────┘
 ```
 
-Each virtual thread owns a connection to one host. The scancheck calls `sendRequest()` which blocks the virtual thread while doing DNS, TCP connect, TLS handshake, send, and response parsing. The JVM's virtual thread scheduler multiplexes onto a small number of carrier threads (default: core count).
+VThreadRequestEngine processes queued requests using virtual threads. Each request blocks its virtual thread during DNS, TCP connect, TLS handshake, send, and response parsing. The JVM's virtual thread scheduler multiplexes onto a small number of carrier threads (default: core count).
 
-Socket reuse across multiple `sendRequest()` calls within the same scancheck (same host) is supported via keep-alive.
+Connection reuse is disabled by default (one connection per request), but must be supported for single-target and repeated-host scenarios via keep-alive, as with `ThreadedRequestEngine`.
+
+### Multi-Host via endpointOverride
+
+The existing `queue()` API already supports `endpoint` parameter (stored as `Request.endpointOverride` as a full URL string). `BurpRequestEngine` routes these through Burp's HTTP stack. `VThreadRequestEngine` parses the URL to extract host/port/scheme, then passes pre-parsed values to VThreadHttpLib — the library layer never sees URL strings. This enables mass multi-host runs (50K+ hosts) without Burp routing overhead.
 
 ## Bottlenecks at 50K Scale
 
@@ -75,7 +80,7 @@ Socket reuse across multiple `sendRequest()` calls within the same scancheck (sa
 
 **Problem:** 50K concurrent responses at ~10KB average = ~500MB. Outlier responses (10MB+) cause GC pressure.
 
-**Mitigation:** Cap response body reads at a configurable limit (e.g. 256KB default). Security scanning rarely needs full bodies. Stream-discard beyond the cap.
+**Mitigation:** Cap response body reads at a configurable limit (e.g. 256KB default). Stream-discard beyond the cap.
 
 ### 6. Memory — TLS Session State
 
@@ -93,20 +98,42 @@ Socket reuse across multiple `sendRequest()` calls within the same scancheck (sa
 
 **Problem:** Some of 50K hosts will be unreachable, slow, or hang. Virtual threads sit blocked, consuming memory.
 
-**Mitigation:** Aggressive `socket.soTimeout` (e.g. 10s). Connect timeout via `socket.connect(addr, timeout)`. Per-host deadline via `StructuredTaskScope.joinUntil()`.
+**Mitigation:** Aggressive `socket.soTimeout` (e.g. 10s). Connect timeout via `socket.connect(addr, timeout)`. Per-host wall-clock deadline by tracking elapsed time and shrinking remaining socket timeouts before each phase.
+
+## VThreadRequestEngine Constructor
+
+Exact 1:1 copy of `ThreadedRequestEngine`'s constructor signature for drop-in replacement:
+
+```kotlin
+class VThreadRequestEngine(
+    url: String,
+    val threads: Int,
+    maxQueueSize: Int,
+    val readFreq: Int,
+    val requestsPerConnection: Int,
+    override val maxRetriesPerRequest: Int,
+    override var idleTimeout: Long = 0,
+    override val callback: (Request, Boolean) -> Boolean,
+    var timeout: Int,
+    override var readCallback: ((String) -> Boolean)?,
+    val readSize: Int,
+    val resumeSSL: Boolean,
+    var explodeOnEarlyRead: Boolean = false
+): RequestEngine()
+```
+
+`threads` controls max concurrent virtual threads (and therefore max concurrent connections), preserving the same throttling semantics as `ThreadedRequestEngine`'s OS thread pool.
 
 ## Relationship to Existing Code
 
-- **ThreadedRequestEngine:** Stays frozen. Not modified. Eventually deprecated.
-- **BurpRequestEngine:** Unrelated. Routes through Burp's HTTP stack.
+- **RequestEngine base class:** `VThreadRequestEngine` extends it. Gets RunHandler/RunManager/MCP/UI integration for free.
+- **ThreadedRequestEngine:** Stays frozen. Not modified. Eventually deprecated. `VThreadRequestEngine` is the replacement path.
+- **BurpRequestEngine:** Unrelated. Routes through Burp's HTTP stack. Already supports `endpointOverride` via Burp's Montoya API.
 - **HTTP2RequestEngine:** Unrelated. Different protocol.
-- **RequestEngine base class:** ScanEngine may or may not extend it. TBD based on whether RunHandler/RunManager integration is useful.
-- **RunHandler/RunManager:** ScanEngine integrates if it helps with lifecycle management and MCP orchestration. Otherwise standalone.
 
 ## Out of Scope
 
-- Scancheck API design (caller's responsibility)
-- Profiling harness (separate design)
 - HTTP/2 support
 - Proxy/Burp routing
 - Request construction or templating
+- Profiling harness (separate design)

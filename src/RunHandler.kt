@@ -16,6 +16,8 @@ class RunHandler (){
 
     fun failCount(): Int = engine?.permaFails?.get() ?: 0
 
+    fun lastError(): String? = engine?.lastError
+
     fun status(): String {
         if (errorFlag) return "failed"
         val eng = engine

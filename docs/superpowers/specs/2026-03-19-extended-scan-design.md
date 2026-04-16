@@ -14,7 +14,7 @@ Extract core logic into reusable functions:
 - `crawl(engine, template)` — seeds BFS queue and processes responses
 - Standalone `queueRequests`/`handleResponse` become thin wrappers creating a `MicroCrawl` instance
 
-### extended-scan.py
+### desync-gadget-hunter.py
 
 New script with:
 
