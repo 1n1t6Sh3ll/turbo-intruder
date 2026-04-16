@@ -65,7 +65,8 @@ engine.queue(
     pauseMarker=[],        # Pause after these strings
     delay=0,               # Delay completion (ms)
     endpoint=None,         # Override target endpoint
-    fixContentLength=True  # Auto-fix Content-Length header
+    fixContentLength=True, # Auto-fix Content-Length header
+    connectionId=None      # Pin to named connection (BURP/BURP2 only)
 )
 ```
 
@@ -82,6 +83,7 @@ engine.queue(
 | `delay` | int | 0 | Delay response processing (ms) |
 | `endpoint` | str | None | Override target for this request |
 | `fixContentLength` | bool | True | Update existing Content-Length header (does not add if missing) |
+| `connectionId` | str | None | Pin request to named connection (BURP/BURP2 only, mutually exclusive with `gate`) |
 
 ### Special Payload Values
 
