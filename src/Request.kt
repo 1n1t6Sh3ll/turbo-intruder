@@ -24,6 +24,7 @@ open class Request(val template: String, val words: List<String?>, val learnBori
     var targetUrl: URL? = null
     var engine: Any? = null
     var connectionID: Int = -1
+    var connectionId: String? = null   // user-specified connection name (input)
     var callback: ((Request, Boolean) -> Boolean)? = null
     var gate: Floodgate? = null
     var order: Int = 0

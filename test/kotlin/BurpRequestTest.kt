@@ -117,4 +117,17 @@ class BurpRequestTest {
         assertEquals(0, req.code)
         assertEquals(0, req.length)
     }
+
+    @Test
+    fun `connectionId field defaults to null`() {
+        val req = Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        assertNull(req.connectionId)
+    }
+
+    @Test
+    fun `connectionId field can be set`() {
+        val req = Request("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+        req.connectionId = "my-connection"
+        assertEquals("my-connection", req.connectionId)
+    }
 }
