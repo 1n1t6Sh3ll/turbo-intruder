@@ -99,6 +99,10 @@ abstract class RequestEngine: IExtensionStateListener {
     fun queue(template: String, payloads: List<kotlin.Any?> = emptyList<kotlin.Any>(), learnBoring: Int = 0, callback: ((Request, Boolean) -> Boolean)? = null, gateName: String? = null, label: String = "", pauseBefore: Int = 0, pauseTime: Int = 1000, pauseMarkers: List<String> = emptyList(), delay: Long = 0, endpoint: String? = null, pythonEngine: Any? = null, fixContentLength: Boolean = true, connectionId: String? = null) {
         updateLastLife()
 
+        if (gateName != null && connectionId != null) {
+            throw Exception("Cannot specify both gate and connectionId - they are mutually exclusive")
+        }
+
         val noPayload = payloads.isEmpty()
         val noMarker = !template.contains("%s")
 
