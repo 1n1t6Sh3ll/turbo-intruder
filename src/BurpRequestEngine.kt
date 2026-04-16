@@ -62,25 +62,27 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
     }
 
     private fun request(service: IHttpService, req: Request) {
-        if (useHTTP1) {
-            val montoyaService = HttpService.httpService(service.host, service.port, "https".equals(service.protocol))
-            val montoyaResp = Utils.montoyaApi.http().sendRequest(HttpRequest.httpRequest(montoyaService, req.getRequest()), HttpMode.HTTP_1)
-            req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
-            req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
-            req.time = req.ttfb
-            if (montoyaResp.response() != null) {
-                req.response = montoyaResp.response().toString()
-            }
+        val montoyaService = HttpService.httpService(service.host, service.port, "https".equals(service.protocol))
+        val protocolVersion = if (useHTTP1) HttpMode.HTTP_1 else HttpMode.HTTP_2
+
+        val montoyaResp = if (req.connectionId != null) {
+            Utils.montoyaApi.http().sendRequest(
+                HttpRequest.httpRequest(montoyaService, req.getRequest()),
+                protocolVersion,
+                req.connectionId
+            )
         } else {
-            val startTime = System.nanoTime()
-            val respBytes = Utils.h2request(service, req.getRequestAsBytes())
-            val responseTime = (System.nanoTime() - startTime) / 1000
-            req.ttfb = responseTime
-            req.ttlb = responseTime
-            req.time = responseTime
-            if (respBytes != null) {
-                req.response = Utils.helpers.bytesToString(respBytes)
-            }
+            Utils.montoyaApi.http().sendRequest(
+                HttpRequest.httpRequest(montoyaService, req.getRequest()),
+                protocolVersion
+            )
+        }
+
+        req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
+        req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
+        req.time = req.ttfb
+        if (montoyaResp.response() != null) {
+            req.response = montoyaResp.response().toString()
         }
     }
 
