@@ -33,6 +33,7 @@ def handleResponse(req, interesting):
     # Metadata
     req.order       # Response order within gate (0 = first)
     req.id          # Unique request ID
+    req.connectionID # Connection sequence number
     req.engine      # Engine instance
 ```
 
