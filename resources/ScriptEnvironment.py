@@ -311,12 +311,12 @@ class RequestEngine:
             self.engine.start(5)
 
 
-    def queue(self, template, payloads=None, learn=0, callback=None, gate=None, label="", pauseBefore=0, pauseTime=1000, pauseMarker=[], delay=0, endpoint=None, fixContentLength=True):
+    def queue(self, template, payloads=None, learn=0, callback=None, gate=None, label="", pauseBefore=0, pauseTime=1000, pauseMarker=[], delay=0, endpoint=None, fixContentLength=True, connectionId=None):
         if payloads == None:
             payloads = []
         elif not isinstance(payloads, list):
             payloads = [str(payloads)]
-        self.engine.queue(template, payloads, learn, callback, gate, label, pauseBefore, pauseTime, pauseMarker, delay, endpoint, self, fixContentLength)
+        self.engine.queue(template, payloads, learn, callback, gate, label, pauseBefore, pauseTime, pauseMarker, delay, endpoint, self, fixContentLength, connectionId)
 
 
     def openGate(self, gate):
