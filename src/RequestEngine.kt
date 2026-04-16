@@ -96,7 +96,7 @@ abstract class RequestEngine: IExtensionStateListener {
         queue(template, payloads, 0, null)
     }
 
-    fun queue(template: String, payloads: List<kotlin.Any?> = emptyList<kotlin.Any>(), learnBoring: Int = 0, callback: ((Request, Boolean) -> Boolean)? = null, gateName: String? = null, label: String = "", pauseBefore: Int = 0, pauseTime: Int = 1000, pauseMarkers: List<String> = emptyList(), delay: Long = 0, endpoint: String? = null, pythonEngine: Any? = null, fixContentLength: Boolean = true) {
+    fun queue(template: String, payloads: List<kotlin.Any?> = emptyList<kotlin.Any>(), learnBoring: Int = 0, callback: ((Request, Boolean) -> Boolean)? = null, gateName: String? = null, label: String = "", pauseBefore: Int = 0, pauseTime: Int = 1000, pauseMarkers: List<String> = emptyList(), delay: Long = 0, endpoint: String? = null, pythonEngine: Any? = null, fixContentLength: Boolean = true, connectionId: String? = null) {
         updateLastLife()
 
         val noPayload = payloads.isEmpty()
@@ -134,6 +134,7 @@ abstract class RequestEngine: IExtensionStateListener {
         request.delayCompletion = delay
         request.endpointOverride = endpoint
         request.autoFixContentLength = fixContentLength
+        request.connectionId = connectionId
 
         if (gateName != null) {
             synchronized(gateName) {
