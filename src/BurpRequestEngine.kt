@@ -3,8 +3,10 @@ import java.lang.RuntimeException
 import java.net.URL
 import java.util.*
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 import burp.api.montoya.http.HttpMode
 import burp.api.montoya.http.HttpService
@@ -15,6 +17,7 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
 
     private val threadPool = ArrayList<Thread>()
     private val gatedRequests: HashMap<String, LinkedList<Request>> = HashMap()
+    private val connectionLocks = ConcurrentHashMap<String, ReentrantLock>()
 
     init {
         requestQueue = if (maxQueueSize > 0) {
@@ -62,30 +65,37 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
     }
 
     private fun request(service: IHttpService, req: Request) {
-        val montoyaService = HttpService.httpService(service.host, service.port, "https".equals(service.protocol))
-        val protocolVersion = if (useHTTP1) HttpMode.HTTP_1 else HttpMode.HTTP_2
+        // Lock on connectionId to ensure sequential requests for connection reuse
+        val lock = req.connectionId?.let { connectionLocks.computeIfAbsent(it) { ReentrantLock() } }
+        lock?.lock()
+        try {
+            val montoyaService = HttpService.httpService(service.host, service.port, "https".equals(service.protocol))
+            val protocolVersion = if (useHTTP1) HttpMode.HTTP_1 else HttpMode.HTTP_2
 
-        val montoyaResp = if (req.connectionId != null) {
-            Utils.montoyaApi.http().sendRequest(
-                HttpRequest.httpRequest(montoyaService, req.getRequest()),
-                protocolVersion,
-                req.connectionId
-            )
-        } else {
-            Utils.montoyaApi.http().sendRequest(
-                HttpRequest.httpRequest(montoyaService, req.getRequest()),
-                protocolVersion
-            )
-        }
+            val montoyaResp = if (req.connectionId != null) {
+                Utils.montoyaApi.http().sendRequest(
+                    HttpRequest.httpRequest(montoyaService, req.getRequest()),
+                    protocolVersion,
+                    req.connectionId
+                )
+            } else {
+                Utils.montoyaApi.http().sendRequest(
+                    HttpRequest.httpRequest(montoyaService, req.getRequest()),
+                    protocolVersion
+                )
+            }
 
-        req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
-        req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
-        req.time = req.ttfb
-        if (montoyaResp.response() != null) {
-            req.response = montoyaResp.response().toString()
-        }
-        if (req.connectionId == null) {
-            req.connectionId = connections.incrementAndGet().toString()
+            req.ttfb = montoyaResp.timingData().get().timeBetweenRequestSentAndStartOfResponse().toNanos() / 1000
+            req.ttlb = montoyaResp.timingData().get().timeBetweenRequestSentAndEndOfResponse().toNanos() / 1000
+            req.time = req.ttfb
+            if (montoyaResp.response() != null) {
+                req.response = montoyaResp.response().toString()
+            }
+            if (req.connectionId == null) {
+                req.connectionId = connections.incrementAndGet().toString()
+            }
+        } finally {
+            lock?.unlock()
         }
     }
 
