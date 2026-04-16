@@ -193,7 +193,7 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
                     Thread.sleep(sleep.toLong() * 200)
                     continue
                 }
-                val connectionID = connections.incrementAndGet()
+                val connectionIdAuto = connections.incrementAndGet().toString()
                 //(socket as SSLSocket).session.peerCertificates
                 socket!!.soTimeout = timeout * 1000
                 socket.tcpNoDelay = true
@@ -484,7 +484,9 @@ open class ThreadedRequestEngine(url: String, val threads: Int, maxQueueSize: In
                         reqWithResponse = inflight.removeFirst()
                         successfulRequests.getAndIncrement()
                         reqWithResponse.response = msg
-                        reqWithResponse.connectionID = connectionID
+                        if (reqWithResponse.connectionId == null) {
+                            reqWithResponse.connectionId = connectionIdAuto
+                        }
                         reqWithResponse.ttfb = (endTime - startTime) / 1000 // convert ns to microseconds
                         reqWithResponse.ttlb = (bodyEndTime - startTime) / 1000
                         reqWithResponse.time = reqWithResponse.ttfb

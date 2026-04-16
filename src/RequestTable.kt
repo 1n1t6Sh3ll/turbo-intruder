@@ -251,7 +251,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
                 htmlTable.append("</td><td>")
                 htmlTable.append(req.order)
                 htmlTable.append("</td><td>")
-                htmlTable.append(req.connectionID)
+                htmlTable.append(req.connectionId)
                 htmlTable.append("</td></tr>")
             }
             htmlTable.append("</table>")

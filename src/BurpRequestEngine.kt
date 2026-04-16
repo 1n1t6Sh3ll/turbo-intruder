@@ -84,6 +84,9 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
         if (montoyaResp.response() != null) {
             req.response = montoyaResp.response().toString()
         }
+        if (req.connectionId == null) {
+            req.connectionId = connections.incrementAndGet().toString()
+        }
     }
 
 
@@ -125,13 +128,13 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                     }
 
                     val protocolVersion: HttpMode
-                    var connectionID = 0
+                    var sharedConnectionId: String? = null
                     if (useHTTP1) {
                         connections.addAndGet(requestGroup.size)
                         protocolVersion = HttpMode.HTTP_1
                     } else {
                         protocolVersion = HttpMode.HTTP_2
-                        connectionID = connections.incrementAndGet()
+                        sharedConnectionId = connections.incrementAndGet().toString()
                     }
 
                     val timer = System.nanoTime()
@@ -157,10 +160,12 @@ open class BurpRequestEngine(url: String, threads: Int, maxQueueSize: Int, overr
                         req.time = req.ttfb
                         req.arrival = (timer - start) / 1000 + req.ttfb
 
-                        if (useHTTP1) {
-                            req.connectionID = connections.incrementAndGet()
-                        } else {
-                            req.connectionID = connectionID
+                        if (req.connectionId == null) {
+                            req.connectionId = if (useHTTP1) {
+                                connections.incrementAndGet().toString()
+                            } else {
+                                sharedConnectionId
+                            }
                         }
                         req.interesting = processResponse(req, resp.response().toByteArray().bytes)
                         reqs.add(req)

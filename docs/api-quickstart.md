@@ -61,7 +61,7 @@ In `handleResponse(req, interesting)`:
 | `req.engine` | obj | Engine instance (for recursive queueing) |
 | `req.order` | int | Response order within gate (0 = first) |
 | `req.id` | int | Unique request ID |
-| `req.connectionID` | int | Connection sequence number |
+| `req.connectionId` | str | Connection identifier (user-specified or auto-assigned) |
 
 ## Engine Types
 

@@ -67,7 +67,7 @@ class RequestTableModel: AbstractTableModel() {
                 8 -> request.arrival
                 9 -> request.label
                 10 -> request.id
-                11 -> request.connectionID
+                11 -> request.connectionId ?: ""
                 else -> throw RuntimeException("Invalid column requested")
             }
         } catch (e: Exception) {

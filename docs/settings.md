@@ -66,7 +66,7 @@ engine.queue(
     delay=0,               # Delay completion (ms)
     endpoint=None,         # Override target endpoint
     fixContentLength=True, # Auto-fix Content-Length header
-    connectionId=None      # Pin to named connection (BURP/BURP2 only)
+    connectionId=None      # Connection identifier (user-specified or auto-assigned)
 )
 ```
 
@@ -83,7 +83,7 @@ engine.queue(
 | `delay` | int | 0 | Delay response processing (ms) |
 | `endpoint` | str | None | Override target for this request |
 | `fixContentLength` | bool | True | Update existing Content-Length header (does not add if missing) |
-| `connectionId` | str | None | Pin request to named connection (BURP/BURP2 only, mutually exclusive with `gate`) |
+| `connectionId` | str | None | Connection identifier. If set, pins request to named connection. If not set, auto-assigned after request (e.g., "1", "2"). Mutually exclusive with `gate`. |
 
 ### Special Payload Values
 
