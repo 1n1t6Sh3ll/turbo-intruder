@@ -3,6 +3,7 @@ package mcp
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper
+import io.modelcontextprotocol.json.schema.jackson.JacksonJsonSchemaValidatorSupplier
 import io.modelcontextprotocol.server.McpServer
 import io.modelcontextprotocol.server.McpStatelessServerFeatures
 import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport
@@ -145,6 +146,7 @@ class TurboMcpServer(
 
         statelessServer = McpServer.sync(transport)
             .jsonMapper(jsonMapper)
+            .jsonSchemaValidator(JacksonJsonSchemaValidatorSupplier().get())
             .serverInfo("turbo-simulator", "1.0.0")
             .uriTemplateManagerFactory(QueryParamAwareUriTemplateManagerFactory())
             .capabilities(McpSchema.ServerCapabilities.builder()
