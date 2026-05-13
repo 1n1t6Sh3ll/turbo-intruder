@@ -126,13 +126,6 @@ class TurboMcpServer(
             EnumSet.of(DispatcherType.REQUEST)
         )
 
-        // Add debug logging filter to track session issues
-        context.addFilter(
-            FilterHolder(McpDebugLoggingFilter()),
-            "/*",
-            EnumSet.of(DispatcherType.REQUEST)
-        )
-
         // Stateless HTTP transport - no sessions, simpler client compatibility
         val transport = HttpServletStatelessServerTransport.builder()
             .jsonMapper(jsonMapper)
@@ -438,39 +431,3 @@ private class HostValidationFilter : Filter {
     }
 }
 
-/**
- * Filter that logs all MCP requests and errors to a file for debugging session issues.
- */
-private class McpDebugLoggingFilter : Filter {
-    companion object {
-        private val logFile = java.io.File("/tmp/mcp-debug.log")
-
-        @Synchronized
-        fun log(message: String) {
-            logFile.appendText("$message\n")
-        }
-    }
-
-    override fun doFilter(request: ServletRequest, response: ServletResponse, chain: FilterChain) {
-        val httpRequest = request as HttpServletRequest
-        val httpResponse = response as HttpServletResponse
-
-        val sessionId = httpRequest.getHeader("mcp-session-id") ?: "no-session"
-        val method = httpRequest.method
-        val timestamp = java.time.Instant.now()
-
-        log("[$timestamp] $method request, session: $sessionId")
-
-        try {
-            chain.doFilter(request, response)
-            log("[$timestamp] $method completed, status: ${httpResponse.status}, session: $sessionId")
-        } catch (e: Exception) {
-            log("[$timestamp] ERROR in $method, session: $sessionId")
-            log("[$timestamp] Exception: ${e.javaClass.name}: ${e.message}")
-            val sw = StringWriter()
-            e.printStackTrace(PrintWriter(sw))
-            log(sw.toString())
-            throw e
-        }
-    }
-}
