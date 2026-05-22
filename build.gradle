@@ -56,8 +56,11 @@ dependencies {
     implementation 'io.modelcontextprotocol.sdk:mcp:0.17.0'
 
     // Embedded Jetty for MCP HTTP transport
-    implementation 'org.eclipse.jetty.ee10:jetty-ee10-servlet:12.0.14'
-    implementation 'org.eclipse.jetty:jetty-server:12.0.14'
+    // 12.1.x required: 12.0.x's encoding.properties lacks `image/*=-` and its
+    // MimeTypes loader crashes if Burp's newer encoding.properties is loaded
+    // instead (via parent-first resource lookup when running as a Burp extension).
+    implementation 'org.eclipse.jetty.ee10:jetty-ee10-servlet:12.1.9'
+    implementation 'org.eclipse.jetty:jetty-server:12.1.9'
 
     // Logging for MCP debugging
     implementation 'ch.qos.logback:logback-classic:1.5.6'
