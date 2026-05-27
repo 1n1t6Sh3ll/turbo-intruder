@@ -205,7 +205,7 @@ class RequestTable(val store: ResultStore, val service: IHttpService, val handle
         reportToOrganizerButton.addActionListener {
             val comment = JOptionPane.showInputDialog(menu, "Comment", "",  JOptionPane.PLAIN_MESSAGE) as String
             val reqs = getSelectedRequests().map(Request::getMontoyaRequest)
-            val notes = comment + "\n" + handler.statusString() + "\n\n" + handler.code
+            val notes = comment + "\n" + handler.statusString() + "\n\n" + SCRIPT_MARKER + "\n" + handler.code
             for (req in reqs) {
                 req!!.annotations().setNotes(notes)
                 Utils.montoyaApi.organizer().sendToOrganizer(req)

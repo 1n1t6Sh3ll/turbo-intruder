@@ -61,6 +61,7 @@ class BurpExtender() : IBurpExtender, IExtensionStateListener, BurpExtension {
         Utils.montoyaApi = montoyaApi
         Utilities.montoyaApi = montoyaApi
         montoyaApi.userInterface().registerContextMenuItemsProvider(BulkMenu())
+        montoyaApi.userInterface().registerContextMenuItemsProvider(OfferTurboIntruderWithScript())
         registerHotkey(montoyaApi)
     }
 
