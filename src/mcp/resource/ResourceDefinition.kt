@@ -1,5 +1,7 @@
 package mcp.resource
 
+import java.net.URLDecoder
+
 class ResourceDefinition(
     val uriPattern: String,
     val name: String,
@@ -80,7 +82,9 @@ class ResourceDefinition(
             .split('&')
             .mapNotNull { param ->
                 val parts = param.split('=', limit = 2)
-                if (parts.size == 2) parts[0] to parts[1] else null
+                if (parts.size == 2) {
+                    URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
+                } else null
             }
             .toMap()
     }

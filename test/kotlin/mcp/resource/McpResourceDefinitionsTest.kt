@@ -167,6 +167,16 @@ class McpResourceDefinitionsTest {
     }
 
     @Test
+    fun `query param values are percent-decoded`() {
+        val definitions = createResourceDefinitions(handlers)
+        val def = definitions.find { it.uriPattern == "turbo://organizer" }!!
+
+        val params = def.parseParams("turbo://organizer?searchNotes=Victim%20Desync%3A%20Confirmed")
+
+        assertEquals("Victim Desync: Confirmed", params.string("searchNotes"))
+    }
+
+    @Test
     fun `result detail handler delegates to summary when id is summary`() {
         // When the MCP SDK misroutes turbo://runs/{run_id}/summary to the {id} handler,
         // the handler should delegate to the summary handler instead of crashing
