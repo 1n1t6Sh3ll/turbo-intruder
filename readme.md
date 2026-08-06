@@ -44,3 +44,9 @@ If you're interested in creating your own implementation of the [single-packet a
 [src/SpikeConnection.kt](https://github.com/PortSwigger/turbo-intruder/blob/89f76a82974f07b1529432bf880157aed5c98045/src/SpikeConnection.kt)
 
 This reference implementation was built on Burp Suite's native HTTP/2 stack. It should be possible to make a similar implementation using any HTTP/2 library that provides a frame-level interface. I've seen Golang's HTTP/2 stack used for some frame-level attacks so that might be a good choice.
+
+#### License
+
+Turbo Intruder is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+Releases up to and including 1.62 were published under the Apache License 2.0, and remain available under those terms. The change to AGPLv3 applies to later versions only. Some parts of the codebase are contributions made under the Apache License 2.0 and stay licensed that way; see [NOTICE](NOTICE) for attribution and [LICENSE-APACHE-2.0](LICENSE-APACHE-2.0) for that license's text.
